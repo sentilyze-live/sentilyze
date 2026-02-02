@@ -1,0 +1,467 @@
+version: '3.8'
+
+services:
+  # Firestore Emulator for caching (Google-native alternative to Redis)
+  firestore-emulator:
+    image: google/cloud-sdk:slim
+    container_name: sentilyze-firestore-emulator
+    ports:
+      - "8080:8080"
+    environment:
+      - FIRESTORE_PROJECT_ID=${GCP_PROJECT_ID:-sentilyze-v5-clean}
+    entrypoint: gcloud
+    command: |
+      beta emulators firestore start
+      --host-port=0.0.0.0:8080
+      --project=${GCP_PROJECT_ID:-sentilyze-v5-clean}
+    networks:
+      - sentilyze-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/v1/projects/${GCP_PROJECT_ID:-sentilyze-v5-clean}/databases/(default)/documents || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # BigQuery Emulator
+  bigquery-emulator:
+    image: ghcr.io/goccy/bigquery-emulator:latest
+    container_name: sentilyze-bigquery-emulator
+    ports:
+      - "9050:9050"
+      - "9060:9060"
+    environment:
+      - BIGQUERY_EMULATOR_PROJECT_ID=${GCP_PROJECT_ID:-sentilyze-v5-clean}
+      - BIGQUERY_EMULATOR_DATASET_ID=sentilyze_dataset
+    volumes:
+      - ./infrastructure/emulator/schemas:/schemas
+    networks:
+      - sentilyze-network
+    command: |
+      --project=${GCP_PROJECT_ID:-sentilyze-v5-clean}
+      --dataset=sentilyze_dataset
+      --port=9050
+      --grpc-port=9060
+
+  # Pub/Sub Emulator
+  pubsub-emulator:
+    image: google/cloud-sdk:slim
+    container_name: sentilyze-pubsub-emulator
+    ports:
+      - "8085:8085"
+    environment:
+      - PUBSUB_PROJECT_ID=${GCP_PROJECT_ID:-sentilyze-v5-clean}
+    entrypoint: gcloud
+    command: |
+      beta emulators pubsub start
+      --host-port=0.0.0.0:8085
+      --project=${GCP_PROJECT_ID:-sentilyze-v5-clean}
+    networks:
+      - sentilyze-network
+
+  # PostgreSQL for prediction tracking
+  postgres:
+    image: postgres:15-alpine
+    container_name: sentilyze-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=${DB_USER:-sentilyze}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-sentilyze123}
+      - POSTGRES_DB=${DB_NAME:-sentilyze_predictions}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - sentilyze-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-sentilyze} -d ${DB_NAME:-sentilyze_predictions}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+    container_name: sentilyze-api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVICE_NAME=api-gateway
+      - PORT=8080
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - CACHE_TYPE=firestore
+      - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
+      - BIGQUERY_EMULATOR_HOST=bigquery-emulator:9050
+      - INGESTION_SERVICE_URL=http://ingestion:8081
+      - PREDICTION_SERVICE_URL=http://prediction-engine:8084
+      - ALERT_SERVICE_URL=http://alert-service:8085
+      - ANALYTICS_SERVICE_URL=http://analytics-engine:8086
+      - TRACKER_SERVICE_URL=http://tracker-service:8087
+      - ENABLE_CRYPTO_MARKET=${ENABLE_CRYPTO_MARKET:-true}
+      - ENABLE_GOLD_MARKET=${ENABLE_GOLD_MARKET:-true}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-sentilyze-v5-clean}
+    volumes:
+      - ./services/api-gateway/src:/app/src
+      - ./shared:/shared
+    networks:
+      - sentilyze-network
+    depends_on:
+      pubsub-emulator:
+        condition: service_started
+      bigquery-emulator:
+        condition: service_started
+    working_dir: /app
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8080 --reload
+
+  # Data Ingestion Service
+  ingestion:
+    build:
+      context: .
+      dockerfile: services/ingestion/Dockerfile
+    container_name: sentilyze-ingestion
+    ports:
+      - "8081:8081"
+    environment:
+      - SERVICE_NAME=ingestion-service
+      - PORT=8081
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - CACHE_TYPE=firestore
+      - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
+      - PUBSUB_TOPIC_RAW_DATA=raw-market-data
+      - ENABLE_CRYPTO_MARKET=${ENABLE_CRYPTO_MARKET:-true}
+      - ENABLE_GOLD_MARKET=${ENABLE_GOLD_MARKET:-true}
+      - COINMARKETCAP_API_KEY=${COINMARKETCAP_API_KEY}
+      - TWITTER_API_KEY=${TWITTER_API_KEY}
+      - TWITTER_API_SECRET=${TWITTER_API_SECRET}
+      - TWITTER_BEARER_TOKEN=${TWITTER_BEARER_TOKEN}
+      - REDDIT_CLIENT_ID=${REDDIT_CLIENT_ID}
+      - REDDIT_CLIENT_SECRET=${REDDIT_CLIENT_SECRET}
+      - GOLD_API_KEY=${GOLD_API_KEY}
+      - NEWS_API_KEY=${NEWS_API_KEY}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-sentilyze-v5-clean}
+    volumes:
+      - ./services/ingestion/src:/app/src
+      - ./shared:/shared
+    networks:
+      - sentilyze-network
+    depends_on:
+      pubsub-emulator:
+        condition: service_started
+    working_dir: /app
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8081 --reload
+
+  # Sentiment Analysis Processor
+  sentiment-processor:
+    build:
+      context: .
+      dockerfile: services/sentiment-processor/Dockerfile
+    container_name: sentilyze-sentiment-processor
+    ports:
+      - "8082:8082"
+    environment:
+      - SERVICE_NAME=sentiment-processor
+      - PORT=8082
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - CACHE_TYPE=firestore
+      - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
+      - PUBSUB_SUBSCRIPTION_RAW_DATA=raw-data-subscription
+      - PUBSUB_TOPIC_PROCESSED_SENTIMENT=processed-sentiment
+      - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-sentilyze-v5-clean}
+    volumes:
+      - ./services/sentiment-processor/src:/app/src
+      - ./shared:/shared
+      - ./models:/app/models
+    networks:
+      - sentilyze-network
+    depends_on:
+      pubsub-emulator:
+        condition: service_started
+    working_dir: /app
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8082 --reload
+
+  # Market Context Processor
+  market-context-processor:
+    build:
+      context: .
+      dockerfile: services/market-context-processor/Dockerfile
+    container_name: sentilyze-market-context-processor
+    ports:
+      - "8083:8083"
+    environment:
+      - SERVICE_NAME=market-context-processor
+      - PORT=8083
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - CACHE_TYPE=firestore
+      - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
+      - PUBSUB_SUBSCRIPTION_PROCESSED_SENTIMENT=processed-sentiment-subscription
+      - PUBSUB_TOPIC_MARKET_CONTEXT=market-context
+      - BIGQUERY_EMULATOR_HOST=bigquery-emulator:9050
+      - BIGQUERY_DATASET=sentilyze_dataset
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-sentilyze-v5-clean}
+    volumes:
+      - ./services/market-context-processor/src:/app/src
+      - ./shared:/shared
+    networks:
+      - sentilyze-network
+    depends_on:
+      pubsub-emulator:
+        condition: service_started
+      bigquery-emulator:
+        condition: service_started
+    working_dir: /app
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8083 --reload
+
+  # Prediction Engine
+  prediction-engine:
+    build:
+      context: .
+      dockerfile: services/prediction-engine/Dockerfile
+    container_name: sentilyze-prediction-engine
+    ports:
+      - "8084:8084"
+    environment:
+      - SERVICE_NAME=prediction-engine
+      - PORT=8084
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - CACHE_TYPE=firestore
+      - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
+      - PUBSUB_SUBSCRIPTION_MARKET_CONTEXT=market-context-subscription
+      - PUBSUB_TOPIC_PREDICTIONS=predictions
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-sentilyze}
+      - DB_PASSWORD=${DB_PASSWORD:-sentilyze123}
+      - DB_NAME=${DB_NAME:-sentilyze_predictions}
+      - ML_MODEL_PATH=/app/models
+      - ENABLE_CRYPTO_PREDICTIONS=${ENABLE_CRYPTO_PREDICTIONS:-true}
+      - ENABLE_GOLD_PREDICTIONS=${ENABLE_GOLD_PREDICTIONS:-true}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-sentilyze-v5-clean}
+    volumes:
+      - ./services/prediction-engine/src:/app/src
+      - ./shared:/shared
+      - ./models:/app/models
+    networks:
+      - sentilyze-network
+    depends_on:
+      pubsub-emulator:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    working_dir: /app
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8084 --reload
+
+  # Alert Service
+  alert-service:
+    build:
+      context: .
+      dockerfile: services/alert-service/Dockerfile
+    container_name: sentilyze-alert-service
+    ports:
+      - "8085:8085"
+    environment:
+      - SERVICE_NAME=alert-service
+      - PORT=8085
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - CACHE_TYPE=firestore
+      - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
+      - PUBSUB_SUBSCRIPTION_PREDICTIONS=predictions-subscription
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - ALERT_EMAIL_FROM=${ALERT_EMAIL_FROM}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      - ENABLE_EMAIL_ALERTS=${ENABLE_EMAIL_ALERTS:-true}
+      - ENABLE_SLACK_ALERTS=${ENABLE_SLACK_ALERTS:-true}
+      - ENABLE_DISCORD_ALERTS=${ENABLE_DISCORD_ALERTS:-false}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-sentilyze-v5-clean}
+    volumes:
+      - ./services/alert-service/src:/app/src
+      - ./shared:/shared
+    networks:
+      - sentilyze-network
+    depends_on:
+      pubsub-emulator:
+        condition: service_started
+    working_dir: /app
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8085 --reload
+
+  # Tracker Service
+  tracker-service:
+    build:
+      context: .
+      dockerfile: services/tracker-service/Dockerfile
+    container_name: sentilyze-tracker-service
+    ports:
+      - "8087:8087"
+    environment:
+      - SERVICE_NAME=tracker-service
+      - PORT=8087
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - CACHE_TYPE=firestore
+      - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
+      - BIGQUERY_EMULATOR_HOST=bigquery-emulator:9050
+      - BIGQUERY_DATASET=sentilyze_dataset
+      - PUBSUB_SUBSCRIPTION_PREDICTIONS=predictions-subscription-tracker
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-sentilyze}
+      - DB_PASSWORD=${DB_PASSWORD:-sentilyze123}
+      - DB_NAME=${DB_NAME:-sentilyze_predictions}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-sentilyze-v5-clean}
+    volumes:
+      - ./services/tracker-service/src:/app/src
+      - ./shared:/shared
+    networks:
+      - sentilyze-network
+    depends_on:
+      pubsub-emulator:
+        condition: service_started
+      bigquery-emulator:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    working_dir: /app
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8087 --reload
+
+  # Analytics Engine
+  analytics-engine:
+    build:
+      context: .
+      dockerfile: services/analytics-engine/Dockerfile
+    container_name: sentilyze-analytics-engine
+    ports:
+      - "8086:8086"
+    environment:
+      - SERVICE_NAME=analytics-engine
+      - PORT=8086
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - CACHE_TYPE=firestore
+      - BIGQUERY_EMULATOR_HOST=bigquery-emulator:9050
+      - BIGQUERY_DATASET=sentilyze_dataset
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-sentilyze}
+      - DB_PASSWORD=${DB_PASSWORD:-sentilyze123}
+      - DB_NAME=${DB_NAME:-sentilyze_predictions}
+      - ANALYTICS_CACHE_TTL=${ANALYTICS_CACHE_TTL:-300}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-sentilyze-v5-clean}
+    volumes:
+      - ./services/analytics-engine/src:/app/src
+      - ./shared:/shared
+    networks:
+      - sentilyze-network
+    depends_on:
+      bigquery-emulator:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    working_dir: /app
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8086 --reload
+
+  # Admin Panel Backend
+  admin-panel:
+    build:
+      context: .
+      dockerfile: services/admin-panel/Dockerfile
+    container_name: sentilyze-admin-panel
+    ports:
+      - "8090:8090"
+    environment:
+      - SERVICE_NAME=admin-panel
+      - PORT=8090
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - DEBUG=${DEBUG:-true}
+      - JWT_SECRET=${JWT_SECRET:-change-this-super-secret-jwt-key-min-32-chars}
+      - JWT_ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - REFRESH_TOKEN_EXPIRE_DAYS=7
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-sentilyze}
+      - DB_PASSWORD=${DB_PASSWORD:-sentilyze123}
+      - DB_NAME=${DB_NAME:-sentilyze_predictions}
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:8090
+      - BIGQUERY_EMULATOR_HOST=bigquery-emulator:9050
+      - BIGQUERY_DATASET=sentilyze_dataset
+      - FIRESTORE_EMULATOR_HOST=firestore-emulator:8080
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-sentilyze-v5-clean}
+      - API_GATEWAY_URL=http://api-gateway:8080
+      - INGESTION_SERVICE_URL=http://ingestion:8081
+      - SENTIMENT_PROCESSOR_URL=http://sentiment-processor:8082
+      - MARKET_CONTEXT_PROCESSOR_URL=http://market-context-processor:8083
+      - PREDICTION_ENGINE_URL=http://prediction-engine:8084
+      - ALERT_SERVICE_URL=http://alert-service:8085
+      - ANALYTICS_ENGINE_URL=http://analytics-engine:8086
+      - TRACKER_SERVICE_URL=http://tracker-service:8087
+      - ENABLE_USER_MANAGEMENT=true
+      - ENABLE_SERVICE_MONITORING=true
+      - ENABLE_ANALYTICS_DASHBOARD=true
+      - ENABLE_LOG_VIEWER=true
+      - RATE_LIMIT_PER_MINUTE=100
+      - SESSION_TIMEOUT_SECONDS=3600
+      - MAX_CONCURRENT_SESSIONS=5
+    volumes:
+      - ./services/admin-panel/src:/app/src
+      - ./shared:/shared
+    networks:
+      - sentilyze-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      bigquery-emulator:
+        condition: service_started
+      firestore-emulator:
+        condition: service_started
+    working_dir: /app
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8090 --reload
+
+  # Web Frontend (Next.js)
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: sentilyze-web
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://localhost:3000/api
+      - ADMIN_PANEL_URL=http://admin-panel:8090
+      - API_GATEWAY_URL=http://api-gateway:8080
+      - ADMIN_API_KEY=${ADMIN_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      - admin-panel
+      - api-gateway
+    networks:
+      - sentilyze-network
+
+  # Pub/Sub Setup (initializes topics and subscriptions)
+  pubsub-setup:
+    build:
+      context: ./infrastructure/pubsub-setup
+      dockerfile: Dockerfile
+    container_name: sentilyze-pubsub-setup
+    environment:
+      - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-sentilyze-v5-clean}
+    networks:
+      - sentilyze-network
+    depends_on:
+      pubsub-emulator:
+        condition: service_started
+    profiles:
+      - setup
+
+volumes:
+  postgres_data:
+
+networks:
+  sentilyze-network:
+    driver: bridge

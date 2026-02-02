@@ -1,0 +1,189 @@
+# Cloud Run Service Configuration for Sentiment Processor with ML Services
+# 
+# Deploy with:
+#   gcloud run services replace infrastructure/cloudrun/sentiment-processor.yaml
+#
+# This service includes:
+# - Semantic Cache (FAISS + Firestore)
+# - Knowledge Graph (spaCy + NetworkX)
+# - 4GB memory for ML models
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: sentiment-processor
+  annotations:
+    run.googleapis.com/ingress: all
+    run.googleapis.com/execution-environment: gen2
+spec:
+  template:
+    metadata:
+      annotations:
+        # Scaling configuration
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "10"
+        
+        # Resource allocation for ML models
+        run.googleapis.com/cpu-throttling: "false"
+        run.googleapis.com/memory: "4Gi"
+        run.googleapis.com/cpu: "2"
+        
+        # Timeout for embedding generation
+        run.googleapis.com/timeout: "300s"
+        
+        # VPC connector if needed (for Redis fallback)
+        # run.googleapis.com/vpc-access-connector: sentilyze-connector
+    spec:
+      containerConcurrency: 80
+      serviceAccountName: sentilyze-sa-sentiment-processor@${GCP_PROJECT_ID}.iam.gserviceaccount.com
+      
+      containers:
+        - image: gcr.io/${GCP_PROJECT_ID}/sentiment-processor:latest
+          ports:
+            - containerPort: 8082
+          
+          env:
+            # Service configuration
+            - name: SERVICE_NAME
+              value: sentiment-processor
+            - name: PORT
+              value: "8082"
+            - name: ENVIRONMENT
+              value: production
+            
+            # GCP Configuration
+            - name: GOOGLE_CLOUD_PROJECT
+              value: ${GCP_PROJECT_ID}
+            - name: GCP_PROJECT_ID
+              value: ${GCP_PROJECT_ID}
+            
+            # Cache configuration
+            - name: CACHE_TYPE
+              value: firestore
+            - name: CACHE_STORAGE_BUCKET
+              value: ${GCP_PROJECT_ID}-cache
+            - name: SEMANTIC_CACHE_ENABLED
+              value: "true"
+            - name: SEMANTIC_CACHE_THRESHOLD
+              value: "0.85"
+            - name: SEMANTIC_CACHE_MAX_ENTRIES
+              value: "10000"
+            
+            # Knowledge Graph configuration
+            - name: KNOWLEDGE_GRAPH_ENABLED
+              value: "true"
+            - name: SPACY_MODEL
+              value: en_core_web_sm
+            
+            # Pub/Sub configuration
+            - name: PUBSUB_TOPIC_RAW_DATA
+              value: raw-market-data
+            - name: PUBSUB_TOPIC_PROCESSED_SENTIMENT
+              value: processed-sentiment
+            
+            # Feature flags
+            - name: ENABLE_CRYPTO_ANALYSIS
+              value: "true"
+            - name: ENABLE_GOLD_ANALYSIS
+              value: "true"
+            
+            # API Keys (from Secret Manager in production)
+            - name: HUGGINGFACE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: huggingface-api-key
+                  key: latest
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openai-api-key
+                  key: latest
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gemini-api-key
+                  key: latest
+          
+          resources:
+            limits:
+              cpu: "2000m"
+              memory: "4Gi"
+            requests:
+              cpu: "1000m"
+              memory: "2Gi"
+          
+          # Health checks
+          startupProbe:
+            httpGet:
+              path: /health/startup
+              port: 8082
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 30
+          
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8082
+            periodSeconds: 30
+            failureThreshold: 3
+          
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8082
+            periodSeconds: 5
+            failureThreshold: 3
+
+---
+# Cloud Storage bucket for FAISS index persistence
+apiVersion: storage.cnrm.cloud.google.com/v1beta1
+kind: StorageBucket
+metadata:
+  name: ${GCP_PROJECT_ID}-cache
+  annotations:
+    cnrm.cloud.google.com/project-id: ${GCP_PROJECT_ID}
+    cnrm.cloud.google.com/deletion-policy: abandon
+spec:
+  location: us-central1
+  storageClass: STANDARD
+  uniformBucketLevelAccess: true
+  versioning:
+    enabled: true
+  lifecycleRules:
+    - action:
+        type: Delete
+      condition:
+        age: 30
+        numNewerVersions: 3
+  retentionPolicy:
+    retentionPeriod: 86400  # 1 day minimum retention
+
+---
+# IAM policy for sentiment-processor service account
+apiVersion: iam.cnrm.cloud.google.com/v1beta1
+kind: IAMPolicyMember
+metadata:
+  name: sentiment-processor-firestore-access
+  namespace: config-control
+spec:
+  member: serviceAccount:sentilyze-sa-sentiment-processor@${GCP_PROJECT_ID}.iam.gserviceaccount.com
+  role: roles/datastore.user
+  resourceRef:
+    apiVersion: resourcemanager.cnrm.cloud.google.com/v1beta1
+    kind: Project
+    external: projects/${GCP_PROJECT_ID}
+
+---
+apiVersion: iam.cnrm.cloud.google.com/v1beta1
+kind: IAMPolicyMember
+metadata:
+  name: sentiment-processor-storage-access
+  namespace: config-control
+spec:
+  member: serviceAccount:sentilyze-sa-sentiment-processor@${GCP_PROJECT_ID}.iam.gserviceaccount.com
+  role: roles/storage.objectAdmin
+  resourceRef:
+    apiVersion: storage.cnrm.cloud.google.com/v1beta1
+    kind: StorageBucket
+    external: ${GCP_PROJECT_ID}-cache

@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "sentilyze-v5-clean"
+  },
+  "targets": {
+    "sentilyze-v5-clean": {
+      "hosting": {
+        "web": [
+          "sentilyze-v5-clean"
+        ]
+      }
+    }
+  }
+}
+

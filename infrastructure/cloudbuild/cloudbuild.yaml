@@ -1,0 +1,456 @@
+# Cloud Build Configuration for Sentilyze (Cloud Run)
+#
+# Notes:
+# - This repo's service Dockerfiles expect build context = repo root (they COPY `shared/`).
+# - We deploy WITHOUT `--no-traffic` so first-time deploy works.
+# - We pass `--quiet` + explicit auth flags to avoid interactive prompts in Cloud Build.
+
+timeout: 3600s
+
+substitutions:
+  _REGION: us-central1
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+steps:
+  # ---------------------------------------------------------------------------
+  # Build images (parallel)
+  # ---------------------------------------------------------------------------
+  - name: "gcr.io/cloud-builders/docker"
+    id: build-api-gateway
+    entrypoint: "sh"
+    env:
+      - "DOCKER_BUILDKIT=1"
+    args:
+      - "-c"
+      - |
+        docker pull "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/api-gateway:latest" || true
+        docker build \
+          --build-arg BUILDKIT_INLINE_CACHE=1 \
+          --cache-from "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/api-gateway:latest" \
+          -t "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/api-gateway:$BUILD_ID" \
+          -t "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/api-gateway:latest" \
+          -f "services/api-gateway/Dockerfile" \
+          "."
+    waitFor: ["-"]
+
+  - name: "gcr.io/cloud-builders/docker"
+    id: build-ingestion
+    entrypoint: "sh"
+    env:
+      - "DOCKER_BUILDKIT=1"
+    args:
+      - "-c"
+      - |
+        docker pull "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/ingestion:latest" || true
+        docker build \
+          --build-arg BUILDKIT_INLINE_CACHE=1 \
+          --cache-from "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/ingestion:latest" \
+          -t "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/ingestion:$BUILD_ID" \
+          -t "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/ingestion:latest" \
+          -f "services/ingestion/Dockerfile" \
+          "."
+    waitFor: ["-"]
+
+  - name: "gcr.io/cloud-builders/docker"
+    id: build-sentiment-processor
+    entrypoint: "sh"
+    env:
+      - "DOCKER_BUILDKIT=1"
+    args:
+      - "-c"
+      - |
+        docker pull "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/sentiment-processor:latest" || true
+        docker build \
+          --build-arg BUILDKIT_INLINE_CACHE=1 \
+          --cache-from "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/sentiment-processor:latest" \
+          -t "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/sentiment-processor:$BUILD_ID" \
+          -t "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/sentiment-processor:latest" \
+          -f "services/sentiment-processor/Dockerfile" \
+          "."
+    waitFor: ["-"]
+
+  - name: "gcr.io/cloud-builders/docker"
+    id: build-market-context-processor
+    entrypoint: "sh"
+    env:
+      - "DOCKER_BUILDKIT=1"
+    args:
+      - "-c"
+      - |
+        docker pull "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/market-context-processor:latest" || true
+        docker build \
+          --build-arg BUILDKIT_INLINE_CACHE=1 \
+          --cache-from "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/market-context-processor:latest" \
+          -t "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/market-context-processor:$BUILD_ID" \
+          -t "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/market-context-processor:latest" \
+          -f "services/market-context-processor/Dockerfile" \
+          "."
+    waitFor: ["-"]
+
+  - name: "gcr.io/cloud-builders/docker"
+    id: build-prediction-engine
+    entrypoint: "sh"
+    env:
+      - "DOCKER_BUILDKIT=1"
+    args:
+      - "-c"
+      - |
+        docker pull "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/prediction-engine:latest" || true
+        docker build \
+          --build-arg BUILDKIT_INLINE_CACHE=1 \
+          --cache-from "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/prediction-engine:latest" \
+          -t "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/prediction-engine:$BUILD_ID" \
+          -t "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/prediction-engine:latest" \
+          -f "services/prediction-engine/Dockerfile" \
+          "."
+    waitFor: ["-"]
+
+  - name: "gcr.io/cloud-builders/docker"
+    id: build-alert-service
+    entrypoint: "sh"
+    env:
+      - "DOCKER_BUILDKIT=1"
+    args:
+      - "-c"
+      - |
+        docker pull "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/alert-service:latest" || true
+        docker build \
+          --build-arg BUILDKIT_INLINE_CACHE=1 \
+          --cache-from "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/alert-service:latest" \
+          -t "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/alert-service:$BUILD_ID" \
+          -t "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/alert-service:latest" \
+          -f "services/alert-service/Dockerfile" \
+          "."
+    waitFor: ["-"]
+
+  - name: "gcr.io/cloud-builders/docker"
+    id: build-tracker-service
+    entrypoint: "sh"
+    env:
+      - "DOCKER_BUILDKIT=1"
+    args:
+      - "-c"
+      - |
+        docker pull "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/tracker-service:latest" || true
+        docker build \
+          --build-arg BUILDKIT_INLINE_CACHE=1 \
+          --cache-from "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/tracker-service:latest" \
+          -t "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/tracker-service:$BUILD_ID" \
+          -t "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/tracker-service:latest" \
+          -f "services/tracker-service/Dockerfile" \
+          "."
+    waitFor: ["-"]
+
+  - name: "gcr.io/cloud-builders/docker"
+    id: build-analytics-engine
+    entrypoint: "sh"
+    env:
+      - "DOCKER_BUILDKIT=1"
+    args:
+      - "-c"
+      - |
+        docker pull "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/analytics-engine:latest" || true
+        docker build \
+          --build-arg BUILDKIT_INLINE_CACHE=1 \
+          --cache-from "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/analytics-engine:latest" \
+          -t "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/analytics-engine:$BUILD_ID" \
+          -t "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/analytics-engine:latest" \
+          -f "services/analytics-engine/Dockerfile" \
+          "."
+    waitFor: ["-"]
+
+  - name: "gcr.io/cloud-builders/docker"
+    id: build-web
+    entrypoint: "sh"
+    env:
+      - "DOCKER_BUILDKIT=1"
+    args:
+      - "-c"
+      - |
+        docker pull "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/web:latest" || true
+        docker build \
+          --build-arg BUILDKIT_INLINE_CACHE=1 \
+          --cache-from "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/web:latest" \
+          -t "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/web:$BUILD_ID" \
+          -t "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/web:latest" \
+          -f "apps/web/Dockerfile" \
+          "apps/web"
+    waitFor: ["-"]
+
+  # ---------------------------------------------------------------------------
+  # Push images (parallel where possible)
+  # ---------------------------------------------------------------------------
+  - name: "gcr.io/cloud-builders/docker"
+    id: push-api-gateway
+    args: ["push", "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/api-gateway:$BUILD_ID"]
+    waitFor: ["build-api-gateway"]
+  - name: "gcr.io/cloud-builders/docker"
+    id: push-api-gateway-latest
+    args: ["push", "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/api-gateway:latest"]
+    waitFor: ["build-api-gateway"]
+
+  - name: "gcr.io/cloud-builders/docker"
+    id: push-ingestion
+    args: ["push", "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/ingestion:$BUILD_ID"]
+    waitFor: ["build-ingestion"]
+  - name: "gcr.io/cloud-builders/docker"
+    id: push-ingestion-latest
+    args: ["push", "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/ingestion:latest"]
+    waitFor: ["build-ingestion"]
+
+  - name: "gcr.io/cloud-builders/docker"
+    id: push-sentiment-processor
+    args: ["push", "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/sentiment-processor:$BUILD_ID"]
+    waitFor: ["build-sentiment-processor"]
+  - name: "gcr.io/cloud-builders/docker"
+    id: push-sentiment-processor-latest
+    args: ["push", "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/sentiment-processor:latest"]
+    waitFor: ["build-sentiment-processor"]
+
+  - name: "gcr.io/cloud-builders/docker"
+    id: push-market-context-processor
+    args: ["push", "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/market-context-processor:$BUILD_ID"]
+    waitFor: ["build-market-context-processor"]
+  - name: "gcr.io/cloud-builders/docker"
+    id: push-market-context-processor-latest
+    args: ["push", "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/market-context-processor:latest"]
+    waitFor: ["build-market-context-processor"]
+
+  - name: "gcr.io/cloud-builders/docker"
+    id: push-prediction-engine
+    args: ["push", "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/prediction-engine:$BUILD_ID"]
+    waitFor: ["build-prediction-engine"]
+  - name: "gcr.io/cloud-builders/docker"
+    id: push-prediction-engine-latest
+    args: ["push", "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/prediction-engine:latest"]
+    waitFor: ["build-prediction-engine"]
+
+  - name: "gcr.io/cloud-builders/docker"
+    id: push-alert-service
+    args: ["push", "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/alert-service:$BUILD_ID"]
+    waitFor: ["build-alert-service"]
+  - name: "gcr.io/cloud-builders/docker"
+    id: push-alert-service-latest
+    args: ["push", "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/alert-service:latest"]
+    waitFor: ["build-alert-service"]
+
+  - name: "gcr.io/cloud-builders/docker"
+    id: push-tracker-service
+    args: ["push", "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/tracker-service:$BUILD_ID"]
+    waitFor: ["build-tracker-service"]
+  - name: "gcr.io/cloud-builders/docker"
+    id: push-tracker-service-latest
+    args: ["push", "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/tracker-service:latest"]
+    waitFor: ["build-tracker-service"]
+
+  - name: "gcr.io/cloud-builders/docker"
+    id: push-analytics-engine
+    args: ["push", "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/analytics-engine:$BUILD_ID"]
+    waitFor: ["build-analytics-engine"]
+  - name: "gcr.io/cloud-builders/docker"
+    id: push-analytics-engine-latest
+    args: ["push", "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/analytics-engine:latest"]
+    waitFor: ["build-analytics-engine"]
+
+  - name: "gcr.io/cloud-builders/docker"
+    id: push-web
+    args: ["push", "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/web:$BUILD_ID"]
+    waitFor: ["build-web"]
+  - name: "gcr.io/cloud-builders/docker"
+    id: push-web-latest
+    args: ["push", "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/web:latest"]
+    waitFor: ["build-web"]
+
+  # ---------------------------------------------------------------------------
+  # Deploy to Cloud Run (parallel-ish)
+  # ---------------------------------------------------------------------------
+  - name: "gcr.io/cloud-builders/gcloud"
+    id: deploy-api-gateway
+    entrypoint: gcloud
+    args:
+      - "run"
+      - "deploy"
+      - "api-gateway"
+      - "--image"
+      - "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/api-gateway:$BUILD_ID"
+      - "--region"
+      - "$_REGION"
+      - "--platform"
+      - "managed"
+      - "--allow-unauthenticated"
+      - "--port"
+      - "8000"
+      - "--set-env-vars"
+      - "ENVIRONMENT=production,SERVICE_NAME=api-gateway,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,PUBSUB_PROJECT_ID=$PROJECT_ID,BIGQUERY_DATASET=sentilyze_dataset,CACHE_TYPE=firestore,ENABLE_CRYPTO_MARKET=true,ENABLE_GOLD_MARKET=true"
+      - "--quiet"
+    waitFor: ["push-api-gateway"]
+
+  - name: "gcr.io/cloud-builders/gcloud"
+    id: deploy-ingestion
+    entrypoint: gcloud
+    args:
+      - "run"
+      - "deploy"
+      - "ingestion"
+      - "--image"
+      - "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/ingestion:$BUILD_ID"
+      - "--region"
+      - "$_REGION"
+      - "--platform"
+      - "managed"
+      - "--allow-unauthenticated"
+      - "--port"
+      - "8000"
+      - "--set-env-vars"
+      - "ENVIRONMENT=production,SERVICE_NAME=ingestion,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,PUBSUB_PROJECT_ID=$PROJECT_ID,BIGQUERY_DATASET=sentilyze_dataset,CACHE_TYPE=firestore,ENABLE_CRYPTO_MARKET=true,ENABLE_GOLD_MARKET=true"
+      - "--quiet"
+    waitFor: ["push-ingestion"]
+
+  - name: "gcr.io/cloud-builders/gcloud"
+    id: deploy-sentiment-processor
+    entrypoint: gcloud
+    args:
+      - "run"
+      - "deploy"
+      - "sentiment-processor"
+      - "--image"
+      - "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/sentiment-processor:$BUILD_ID"
+      - "--region"
+      - "$_REGION"
+      - "--platform"
+      - "managed"
+      - "--allow-unauthenticated"
+      - "--port"
+      - "8000"
+      - "--set-env-vars"
+      - "ENVIRONMENT=production,SERVICE_NAME=sentiment-processor,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,PUBSUB_PROJECT_ID=$PROJECT_ID,BIGQUERY_DATASET=sentilyze_dataset,CACHE_TYPE=firestore,ENABLE_CRYPTO_MARKET=true,ENABLE_GOLD_MARKET=true"
+      - "--quiet"
+    waitFor: ["push-sentiment-processor"]
+
+  - name: "gcr.io/cloud-builders/gcloud"
+    id: deploy-market-context-processor
+    entrypoint: gcloud
+    args:
+      - "run"
+      - "deploy"
+      - "market-context-processor"
+      - "--image"
+      - "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/market-context-processor:$BUILD_ID"
+      - "--region"
+      - "$_REGION"
+      - "--platform"
+      - "managed"
+      - "--allow-unauthenticated"
+      - "--port"
+      - "8000"
+      - "--set-env-vars"
+      - "ENVIRONMENT=production,SERVICE_NAME=market-context-processor,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,PUBSUB_PROJECT_ID=$PROJECT_ID,BIGQUERY_DATASET=sentilyze_dataset,CACHE_TYPE=firestore,ENABLE_CRYPTO_MARKET=true,ENABLE_GOLD_MARKET=true"
+      - "--quiet"
+    waitFor: ["push-market-context-processor"]
+
+  - name: "gcr.io/cloud-builders/gcloud"
+    id: deploy-prediction-engine
+    entrypoint: gcloud
+    args:
+      - "run"
+      - "deploy"
+      - "prediction-engine"
+      - "--image"
+      - "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/prediction-engine:$BUILD_ID"
+      - "--region"
+      - "$_REGION"
+      - "--platform"
+      - "managed"
+      - "--allow-unauthenticated"
+      - "--port"
+      - "8000"
+      - "--set-env-vars"
+      - "ENVIRONMENT=production,SERVICE_NAME=prediction-engine,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,PUBSUB_PROJECT_ID=$PROJECT_ID,BIGQUERY_DATASET=sentilyze_dataset,CACHE_TYPE=firestore,ENABLE_CRYPTO_PREDICTIONS=true,ENABLE_GOLD_PREDICTIONS=true"
+      - "--quiet"
+    waitFor: ["push-prediction-engine"]
+
+  - name: "gcr.io/cloud-builders/gcloud"
+    id: deploy-alert-service
+    entrypoint: gcloud
+    args:
+      - "run"
+      - "deploy"
+      - "alert-service"
+      - "--image"
+      - "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/alert-service:$BUILD_ID"
+      - "--region"
+      - "$_REGION"
+      - "--platform"
+      - "managed"
+      - "--allow-unauthenticated"
+      - "--port"
+      - "8000"
+      - "--set-env-vars"
+      - "ENVIRONMENT=production,SERVICE_NAME=alert-service,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,PUBSUB_PROJECT_ID=$PROJECT_ID,BIGQUERY_DATASET=sentilyze_dataset,CACHE_TYPE=firestore"
+      - "--quiet"
+    waitFor: ["push-alert-service"]
+
+  - name: "gcr.io/cloud-builders/gcloud"
+    id: deploy-tracker-service
+    entrypoint: gcloud
+    args:
+      - "run"
+      - "deploy"
+      - "tracker-service"
+      - "--image"
+      - "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/tracker-service:$BUILD_ID"
+      - "--region"
+      - "$_REGION"
+      - "--platform"
+      - "managed"
+      - "--allow-unauthenticated"
+      - "--port"
+      - "8000"
+      - "--set-env-vars"
+      - "ENVIRONMENT=production,SERVICE_NAME=tracker-service,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,PUBSUB_PROJECT_ID=$PROJECT_ID,BIGQUERY_DATASET=sentilyze_dataset,CACHE_TYPE=firestore"
+      - "--quiet"
+    waitFor: ["push-tracker-service"]
+
+  - name: "gcr.io/cloud-builders/gcloud"
+    id: deploy-analytics-engine
+    entrypoint: gcloud
+    args:
+      - "run"
+      - "deploy"
+      - "analytics-engine"
+      - "--image"
+      - "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/analytics-engine:$BUILD_ID"
+      - "--region"
+      - "$_REGION"
+      - "--platform"
+      - "managed"
+      - "--allow-unauthenticated"
+      - "--port"
+      - "8000"
+      - "--set-env-vars"
+      - "ENVIRONMENT=production,SERVICE_NAME=analytics-engine,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,PUBSUB_PROJECT_ID=$PROJECT_ID,BIGQUERY_DATASET=sentilyze_dataset,CACHE_TYPE=firestore"
+      - "--quiet"
+    waitFor: ["push-analytics-engine"]
+
+  - name: "gcr.io/cloud-builders/gcloud"
+    id: deploy-web
+    entrypoint: gcloud
+    args:
+      - "run"
+      - "deploy"
+      - "sentilyze-web"
+      - "--image"
+      - "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/web:$BUILD_ID"
+      - "--region"
+      - "$_REGION"
+      - "--platform"
+      - "managed"
+      - "--allow-unauthenticated"
+      - "--port"
+      - "3000"
+      - "--set-env-vars"
+      - "ENVIRONMENT=production,SERVICE_NAME=web,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,API_GATEWAY_URL=https://api-gateway-$_REGION-$PROJECT_ID.cloudfunctions.net,ENABLE_GOLD_DATA=true,ENABLE_CRYPTO_DATA=true"
+      - "--quiet"
+    waitFor: ["push-web"]

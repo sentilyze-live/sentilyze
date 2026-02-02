@@ -1,0 +1,57 @@
+timeout: 3600s
+
+substitutions:
+  _REGION: us-central1
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+steps:
+  - name: "gcr.io/cloud-builders/docker"
+    id: build-api-gateway
+    entrypoint: "sh"
+    env:
+      - "DOCKER_BUILDKIT=1"
+    args:
+      - "-c"
+      - |
+        docker pull "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/api-gateway:latest" || true
+        docker build \
+          --build-arg BUILDKIT_INLINE_CACHE=1 \
+          --cache-from "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/api-gateway:latest" \
+          -t "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/api-gateway:$BUILD_ID" \
+          -t "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/api-gateway:latest" \
+          -f "services/api-gateway/Dockerfile" \
+          "."
+
+  - name: "gcr.io/cloud-builders/docker"
+    id: push-api-gateway
+    args: ["push", "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/api-gateway:$BUILD_ID"]
+    waitFor: ["build-api-gateway"]
+
+  - name: "gcr.io/cloud-builders/docker"
+    id: push-api-gateway-latest
+    args: ["push", "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/api-gateway:latest"]
+    waitFor: ["build-api-gateway"]
+
+  - name: "gcr.io/cloud-builders/gcloud"
+    id: deploy-api-gateway
+    entrypoint: gcloud
+    args:
+      - "run"
+      - "deploy"
+      - "api-gateway"
+      - "--image"
+      - "$_REGION-docker.pkg.dev/$PROJECT_ID/sentilyze/api-gateway:$BUILD_ID"
+      - "--region"
+      - "$_REGION"
+      - "--platform"
+      - "managed"
+      - "--allow-unauthenticated"
+      - "--port"
+      - "8000"
+      - "--set-env-vars"
+      - "ENVIRONMENT=production,SERVICE_NAME=api-gateway,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,PUBSUB_PROJECT_ID=$PROJECT_ID,BIGQUERY_DATASET=sentilyze_dataset,CACHE_TYPE=firestore,ENABLE_CRYPTO_MARKET=true,ENABLE_GOLD_MARKET=true,RATE_LIMIT_ENABLED=true"
+      - "--quiet"
+    waitFor: ["push-api-gateway"]
+

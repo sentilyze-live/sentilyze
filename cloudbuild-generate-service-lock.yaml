@@ -1,0 +1,27 @@
+timeout: 3600s
+
+options:
+  logging: LEGACY
+
+substitutions:
+  _SERVICE: "api-gateway"
+
+steps:
+  - name: "python:3.11-slim"
+    id: lock
+    entrypoint: "sh"
+    args:
+      - "-c"
+      - |
+        set -e
+        python -m pip install --no-cache-dir poetry==1.7.1
+        cd "services/${_SERVICE}"
+        poetry lock --no-interaction --no-ansi
+
+  - name: "gcr.io/cloud-builders/gsutil"
+    id: upload
+    args:
+      - "cp"
+      - "services/${_SERVICE}/poetry.lock"
+      - "gs://${PROJECT_ID}_cloudbuild/locks/${_SERVICE}/poetry.lock"
+

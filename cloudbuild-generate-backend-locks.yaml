@@ -1,0 +1,59 @@
+timeout: 7200s
+
+options:
+  logging: LEGACY
+
+steps:
+  # Generate locks for all backend services EXCEPT sentiment-processor first,
+  # so they can be uploaded even if sentiment-processor lock is slow.
+  - name: "python:3.11-slim"
+    id: lock-backend-fast
+    entrypoint: "sh"
+    args:
+      - "-c"
+      - |
+        set -e
+        python -m pip install --no-cache-dir poetry==1.7.1
+
+        services="api-gateway ingestion market-context-processor prediction-engine alert-service tracker-service analytics-engine"
+        for svc in $services; do
+          echo "=== Generating poetry.lock for $svc ==="
+          cd "services/$svc"
+          poetry lock --no-interaction --no-ansi
+          cd ../..
+        done
+
+  - name: "gcr.io/cloud-builders/gsutil"
+    id: upload-backend-fast-locks
+    waitFor: ["lock-backend-fast"]
+    entrypoint: "sh"
+    args:
+      - "-c"
+      - |
+        set -e
+        services="api-gateway ingestion market-context-processor prediction-engine alert-service tracker-service analytics-engine"
+        for svc in $services; do
+          gsutil cp "services/$svc/poetry.lock" "gs://${PROJECT_ID}_cloudbuild/locks/$svc/poetry.lock"
+        done
+
+  # Now generate sentiment-processor lock separately (can be slow due to ML group).
+  - name: "python:3.11-slim"
+    id: lock-sentiment-processor
+    waitFor: ["upload-backend-fast-locks"]
+    entrypoint: "sh"
+    args:
+      - "-c"
+      - |
+        set -e
+        python -m pip install --no-cache-dir poetry==1.7.1
+        cd "services/sentiment-processor"
+        poetry lock --no-interaction --no-ansi -vvv
+
+  - name: "gcr.io/cloud-builders/gsutil"
+    id: upload-sentiment-lock
+    waitFor: ["lock-sentiment-processor"]
+    args:
+      - "cp"
+      - "services/sentiment-processor/poetry.lock"
+      - "gs://${PROJECT_ID}_cloudbuild/locks/sentiment-processor/poetry.lock"
+

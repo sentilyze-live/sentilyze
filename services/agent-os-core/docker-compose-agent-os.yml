@@ -1,0 +1,86 @@
+# Agent OS Core - Docker Compose Extension
+# Add this to the main docker-compose.yml or run separately
+
+version: '3.8'
+
+services:
+  # Agent OS Core - AI Agent Orchestration System
+  agent-os-core:
+    build:
+      context: ../..
+      dockerfile: services/agent-os-core/Dockerfile
+    container_name: sentilyze-agent-os-core
+    ports:
+      - "8091:8080"
+    environment:
+      - SERVICE_NAME=agent-os-core
+      - PORT=8080
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-sentilyze-v5-clean}
+      - GCP_REGION=${GCP_REGION:-us-central1}
+      - BIGQUERY_DATASET=${BIGQUERY_DATASET:-sentilyze_dataset}
+      - BIGQUERY_EMULATOR_HOST=bigquery-emulator:9050
+      - FIRESTORE_EMULATOR_HOST=firestore-emulator:8080
+      - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
+      - CACHE_TYPE=firestore
+      - MOONSHOT_API_KEY=${MOONSHOT_API_KEY}
+      - MOONSHOT_BASE_URL=${MOONSHOT_BASE_URL:-https://api.moonshot.cn/v1}
+      - HIGGSFIELD_API_KEY=${HIGGSFIELD_API_KEY}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - ENABLE_TELEGRAM_NOTIFICATIONS=${ENABLE_TELEGRAM_NOTIFICATIONS:-true}
+      # Feature Flags
+      - ENABLE_SCOUT=${ENABLE_SCOUT:-true}
+      - ENABLE_ELON=${ENABLE_ELON:-true}
+      - ENABLE_SETH=${ENABLE_SETH:-true}
+      - ENABLE_ZARA=${ENABLE_ZARA:-true}
+      - ENABLE_ORACLE=${ENABLE_ORACLE:-true}
+      # OPTIMIZED Agent Scheduling (minutes)
+      # ZARA: Every 6 hours (product not launched yet, minimal community activity)
+      # TODO: Change to 30min after product launch
+      - ZARA_INTERVAL_MINUTES=${ZARA_INTERVAL_MINUTES:-360}
+      # SCOUT: Every 3 hours (increased from 6h for crypto volatility)
+      - SCOUT_INTERVAL_MINUTES=${SCOUT_INTERVAL_MINUTES:-180}
+      # ORACLE: Every 6 hours (syncs with SCOUT)
+      - ORACLE_INTERVAL_MINUTES=${ORACLE_INTERVAL_MINUTES:-360}
+      # ELON: Every 12 hours (morning & evening checks)
+      - ELON_INTERVAL_MINUTES=${ELON_INTERVAL_MINUTES:-720}
+      # SETH: Daily (increased from weekly for trend-responsiveness)
+      - SETH_INTERVAL_MINUTES=${SETH_INTERVAL_MINUTES:-1440}
+      - SHARED_DIR=/shared/agent_os
+    volumes:
+      - ./src:/app/src
+      - ../../shared:/shared
+    networks:
+      - sentilyze-network
+    depends_on:
+      - pubsub-emulator
+      - bigquery-emulator
+      - firestore-emulator
+    working_dir: /app
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8080 --reload
+
+  # Agent OS Scheduler - Cron job runner for agents
+  agent-os-scheduler:
+    build:
+      context: ../..
+      dockerfile: services/agent-os-core/Dockerfile.scheduler
+    container_name: sentilyze-agent-os-scheduler
+    environment:
+      - AGENT_OS_CORE_URL=http://agent-os-core:8080
+      # OPTIMIZED Schedules matching config.py
+      # ZARA: 6 hours (product not launched)
+      - SCHEDULE_ZARA=${ZARA_INTERVAL_MINUTES:-360}
+      - SCHEDULE_SCOUT=${SCOUT_INTERVAL_MINUTES:-180}
+      - SCHEDULE_ORACLE=${ORACLE_INTERVAL_MINUTES:-360}
+      - SCHEDULE_ELON=${ELON_INTERVAL_MINUTES:-720}
+      - SCHEDULE_SETH=${SETH_INTERVAL_MINUTES:-1440}
+    networks:
+      - sentilyze-network
+    depends_on:
+      - agent-os-core
+
+networks:
+  sentilyze-network:
+    external: true

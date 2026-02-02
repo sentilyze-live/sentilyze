@@ -1,0 +1,69 @@
+# Data Retention Policy Configuration for Sentilyze
+# This file defines retention policies for different data types
+
+environment: dev
+
+# BigQuery Table Retention Policies (in days)
+bigquery_retention:
+  raw_events: 90
+  processed_events: 365
+  analytics_daily: 730
+  audit_logs: 2555  # 7 years
+  temp_tables: 7
+  sentiment_analysis: 365
+  batch_jobs: 30
+  performance_metrics: 30
+
+# Cloud Storage Bucket Retention (in days)
+storage_retention:
+  uploads: 30
+  temp: 7
+  backups_daily: 30
+  backups_weekly: 90
+  exports: 90
+
+# PostgreSQL Table Archival (in days)
+postgresql_retention:
+  job_logs: 90
+  event_logs: 180
+  temp_data: 1
+  session_data: 7
+
+# Log Retention (in days)
+log_retention:
+  application_logs: 30
+  audit_logs: 2555
+  error_logs: 90
+  access_logs: 30
+
+# Archive Configuration
+archive:
+  enabled: true
+  destination: bigquery  # bigquery, storage, or both
+  archive_path: "gs://${PROJECT_ID}-archives"
+  compress: true
+  compression_format: gzip
+
+# Cleanup Schedule
+cleanup_schedule:
+  daily: temp_tables, temp_data, session_data
+  weekly: raw_events, uploads, application_logs
+  monthly: processed_events, job_logs, event_logs
+  yearly: audit_logs
+
+# Notifications
+notifications:
+  enabled: true
+  slack_webhook: ${SLACK_WEBHOOK_URL}
+  email: ${RETENTION_ALERT_EMAIL}
+  on_failure: true
+  on_success: false
+  summary_report: true
+
+# Safety Settings
+safety:
+  dry_run_first: true
+  confirm_deletions: false
+  max_deletion_batch: 10000
+  backup_before_delete: true
+  delete_empty_partitions_only: false

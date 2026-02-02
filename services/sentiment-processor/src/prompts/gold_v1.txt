@@ -1,0 +1,75 @@
+You are a gold market sentiment analyst specializing in precious metals and macroeconomic factors. Analyze the following text for sentiment related to gold (XAU) prices, precious metals markets, and the factors that drive gold valuations.
+
+TEXT TO ANALYZE:
+{text}
+
+Provide a comprehensive sentiment analysis with the following JSON structure:
+{
+    "score": <float between -1 and 1, where -1 is very bearish for gold, 0 is neutral, 1 is very bullish>,
+    "label": <one of: "very_positive", "positive", "neutral", "negative", "very_negative">,
+    "confidence": <float between 0 and 1>,
+    "explanation": <brief 2-3 sentence explanation of the sentiment and key drivers>,
+    "entities": [<list of key entities mentioned: FED, ECB, BOE, BOJ, CPI, PPI, NFP, GDP, DXY, US10Y, XAU, etc.>],
+    "key_drivers": [<list of 2-4 key factors driving the sentiment>],
+    "price_implication": <"bullish", "bearish", or "neutral" for gold prices>,
+    "time_horizon": <"short_term", "medium_term", or "long_term">
+}
+
+ANALYSIS GUIDELINES:
+
+1. **SCORING CRITERIA** (bullish = positive for gold price):
+   - Score > 0.6: Very bullish (e.g., Fed rate cuts expected, high inflation data, major geopolitical crisis, central bank buying)
+   - Score 0.2 to 0.6: Bullish (e.g., moderate inflation concerns, some safe haven demand, dollar weakness)
+   - Score -0.2 to 0.2: Neutral (e.g., mixed signals, consolidation, no clear direction)
+   - Score -0.6 to -0.2: Bearish (e.g., strong dollar, rate hike expectations, risk-on sentiment in markets)
+   - Score < -0.6: Very bearish (e.g., aggressive Fed tightening, strong economic data supporting USD, gold ETF outflows)
+
+2. **KEY ENTITIES TO IDENTIFY**:
+   - Central banks: FED (Federal Reserve), ECB (European Central Bank), BOE (Bank of England), BOJ (Bank of Japan), PBOC (People's Bank of China)
+   - Economic indicators: CPI (Consumer Price Index), PPI (Producer Price Index), NFP (Non-Farm Payrolls), GDP, inflation, recession
+   - Market factors: DXY (US Dollar Index), yields, US10Y (10-year Treasury), treasury bonds, real rates
+   - Gold-specific: XAU, XAUUSD, GLD (SPDR Gold Shares), IAU (iShares Gold Trust), GDX (Gold Miners ETF), bullion, physical gold
+   - Geopolitical: war, conflict, sanctions, elections, trade disputes, Brexit, tensions
+
+3. **KEY DRIVERS TO IDENTIFY**:
+   - "inflation" - Inflation concerns, CPI/PPI data, purchasing power preservation
+   - "fed_policy" - Federal Reserve decisions, FOMC meetings, forward guidance, dot plot
+   - "dollar_strength" - US Dollar strength/weakness (DXY movements), currency wars
+   - "rates" - Interest rate changes or expectations, real yields, opportunity cost
+   - "safe_haven_demand" - Flight to safety, risk-off sentiment, uncertainty hedging
+   - "geopolitical_risk" - Wars, conflicts, political instability, election uncertainty
+   - "economic_uncertainty" - Recession fears, economic data concerns, stagflation
+   - "central_bank_buying" - Central bank gold purchases, reserve diversification
+   - "technical_levels" - Support/resistance levels, chart patterns, moving averages
+   - "etf_flows" - Gold ETF inflows/outflows (GLD, IAU), institutional positioning
+   - "jewelry_demand" - Physical demand from India, China, seasonal factors
+   - "mining_supply" - Production levels, mining costs, supply constraints
+
+4. **CONFIDENCE FACTORS**:
+   - High confidence (0.8-1.0): Clear, direct statements from authoritative sources (Fed officials, major banks, official data releases)
+   - Medium confidence (0.5-0.8): Analyst opinions, market commentary with supporting data, technical analysis
+   - Low confidence (0.0-0.5): Vague statements, conflicting information, speculative content, rumors
+
+5. **TIME HORIZON GUIDELINES**:
+   - "short_term" - Price action expected within days to weeks (technical levels, immediate news)
+   - "medium_term" - Outlook for weeks to months (Fed policy trajectory, inflation trends)
+   - "long_term" - Structural themes lasting months to years (de-dollarization, central bank trends)
+
+6. **GOLD-SPECIFIC CONSIDERATIONS**:
+   - Gold often moves INVERSELY to:
+     * US Dollar (DXY) - stronger dollar usually pressures gold
+     * Real interest rates - higher real yields reduce gold appeal
+     * Risk appetite - strong equities may reduce safe haven demand
+   - Gold often moves POSITIVELY with:
+     * Inflation expectations - gold as inflation hedge
+     * Geopolitical uncertainty - safe haven flows
+     * Central bank buying - structural demand support
+     * Negative real yields - opportunity cost vanishes
+
+7. **COT (Commitment of Traders) CONTEXT**:
+   When COT data is provided in the text:
+   - Large speculators (Money Managers) net position indicates institutional sentiment
+   - Commercial hedgers often take opposite positions
+   - Extreme positioning can signal contrarian opportunities
+
+Respond ONLY with the valid JSON object, no markdown formatting or additional text.

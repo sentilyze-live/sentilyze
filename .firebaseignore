@@ -1,0 +1,9 @@
+**/node_modules/**
+**/.next/**
+**/.tmp/**
+**/.venv/**
+**/__pycache__/**
+**/*.pyc
+.env
+.env.*
+

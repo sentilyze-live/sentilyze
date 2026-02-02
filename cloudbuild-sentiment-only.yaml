@@ -1,0 +1,61 @@
+timeout: 3600s
+
+options:
+  logging: LEGACY
+
+steps:
+  # Build sentiment-processor image
+  - name: "gcr.io/cloud-builders/docker"
+    id: build-sentiment-processor
+    entrypoint: "sh"
+    env:
+      - "DOCKER_BUILDKIT=1"
+    args:
+      - "-c"
+      - |
+        docker pull "us-central1-docker.pkg.dev/$PROJECT_ID/sentilyze/sentiment-processor:latest" || true
+        docker build \
+          --build-arg BUILDKIT_INLINE_CACHE=1 \
+          --cache-from "us-central1-docker.pkg.dev/$PROJECT_ID/sentilyze/sentiment-processor:latest" \
+          -t "us-central1-docker.pkg.dev/$PROJECT_ID/sentilyze/sentiment-processor:$BUILD_ID" \
+          -t "us-central1-docker.pkg.dev/$PROJECT_ID/sentilyze/sentiment-processor:latest" \
+          -f "services/sentiment-processor/Dockerfile" \
+          "."
+
+  # Push with BUILD_ID tag
+  - name: "gcr.io/cloud-builders/docker"
+    id: push-sentiment-processor
+    args:
+      - "push"
+      - "us-central1-docker.pkg.dev/$PROJECT_ID/sentilyze/sentiment-processor:$BUILD_ID"
+    waitFor: ["build-sentiment-processor"]
+
+  # Push with latest tag
+  - name: "gcr.io/cloud-builders/docker"
+    id: push-sentiment-processor-latest
+    args:
+      - "push"
+      - "us-central1-docker.pkg.dev/$PROJECT_ID/sentilyze/sentiment-processor:latest"
+    waitFor: ["build-sentiment-processor"]
+
+  # Deploy to Cloud Run
+  - name: "gcr.io/cloud-builders/gcloud"
+    id: deploy-sentiment-processor
+    entrypoint: gcloud
+    args:
+      - "run"
+      - "deploy"
+      - "sentiment-processor"
+      - "--image"
+      - "us-central1-docker.pkg.dev/$PROJECT_ID/sentilyze/sentiment-processor:$BUILD_ID"
+      - "--region"
+      - "us-central1"
+      - "--platform"
+      - "managed"
+      - "--allow-unauthenticated"
+      - "--port"
+      - "8000"
+      - "--set-env-vars"
+      - "ENVIRONMENT=production,SERVICE_NAME=sentiment-processor,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,PUBSUB_PROJECT_ID=$PROJECT_ID,BIGQUERY_DATASET=sentilyze_dataset,CACHE_TYPE=firestore,ENABLE_CRYPTO_MARKET=true,ENABLE_GOLD_MARKET=true"
+      - "--quiet"
+    waitFor: ["push-sentiment-processor"]

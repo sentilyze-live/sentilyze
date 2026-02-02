@@ -1,0 +1,59 @@
+[tool.poetry]
+name = "api-gateway"
+version = "4.0.0"
+description = "Unified API Gateway for Sentilyze - Crypto and Gold Market Analysis"
+authors = ["Sentilyze Team <team@sentilyze.live>"]
+readme = "README.md"
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+# Shared core library
+sentilyze-core = {path = "../../shared", develop = true}
+# FastAPI and server
+fastapi = "^0.109.0"
+uvicorn = {extras = ["standard"], version = "^0.27.0"}
+# Authentication
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+passlib = {extras = ["bcrypt"], version = "^1.7.0"}
+python-multipart = "^0.0.6"
+# HTTP client
+httpx = "^0.28.1"
+# WebSocket
+websockets = "^12.0"
+# Data and validation
+pydantic = "^2.5.0"
+pydantic-settings = "^2.1.0"
+# Security and utilities
+slowapi = "^0.1.9"
+cloudscraper = "^1.2.71"
+beautifulsoup4 = "^4.13.4"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+pytest-asyncio = "^0.21.0"
+black = "^24.0.0"
+isort = "^5.13.0"
+ruff = "^0.1.0"
+mypy = "^1.8.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.mypy]
+python_version = "3.11"
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

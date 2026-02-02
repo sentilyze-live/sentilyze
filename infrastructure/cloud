@@ -1,0 +1,484 @@
+steps:
+  # ==========================================
+  # BUILD STEPS (Parallel)
+  # ==========================================
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build-api-gateway
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/api-gateway:$COMMIT_SHA'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/api-gateway:latest'
+      - '-f'
+      - 'services/api-gateway/Dockerfile'
+      - '.'
+    waitFor: ['-']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build-ingestion
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/ingestion:$COMMIT_SHA'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/ingestion:latest'
+      - '-f'
+      - 'services/ingestion/Dockerfile'
+      - '.'
+    waitFor: ['-']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build-sentiment-processor
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/sentiment-processor:$COMMIT_SHA'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/sentiment-processor:latest'
+      - '-f'
+      - 'services/sentiment-processor/Dockerfile'
+      - '.'
+    waitFor: ['-']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build-market-context-processor
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/market-context-processor:$COMMIT_SHA'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/market-context-processor:latest'
+      - '-f'
+      - 'services/market-context-processor/Dockerfile'
+      - '.'
+    waitFor: ['-']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build-prediction-engine
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/prediction-engine:$COMMIT_SHA'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/prediction-engine:latest'
+      - '-f'
+      - 'services/prediction-engine/Dockerfile'
+      - '.'
+    waitFor: ['-']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build-alert-service
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/alert-service:$COMMIT_SHA'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/alert-service:latest'
+      - '-f'
+      - 'services/alert-service/Dockerfile'
+      - '.'
+    waitFor: ['-']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build-tracker-service
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/tracker-service:$COMMIT_SHA'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/tracker-service:latest'
+      - '-f'
+      - 'services/tracker-service/Dockerfile'
+      - '.'
+    waitFor: ['-']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build-analytics-engine
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/analytics-engine:$COMMIT_SHA'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/analytics-engine:latest'
+      - '-f'
+      - 'services/analytics-engine/Dockerfile'
+      - '.'
+    waitFor: ['-']
+
+  # ==========================================
+  # PUSH STEPS (Parallel)
+  # ==========================================
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push-api-gateway
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/api-gateway:$COMMIT_SHA'
+    waitFor: ['build-api-gateway']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push-ingestion
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/ingestion:$COMMIT_SHA'
+    waitFor: ['build-ingestion']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push-sentiment-processor
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/sentiment-processor:$COMMIT_SHA'
+    waitFor: ['build-sentiment-processor']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push-market-context-processor
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/market-context-processor:$COMMIT_SHA'
+    waitFor: ['build-market-context-processor']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push-prediction-engine
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/prediction-engine:$COMMIT_SHA'
+    waitFor: ['build-prediction-engine']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push-alert-service
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/alert-service:$COMMIT_SHA'
+    waitFor: ['build-alert-service']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push-tracker-service
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/tracker-service:$COMMIT_SHA'
+    waitFor: ['build-tracker-service']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push-analytics-engine
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/analytics-engine:$COMMIT_SHA'
+    waitFor: ['build-analytics-engine']
+
+  # ==========================================
+  # DEPLOY STEPS (--allow-unauthenticated ve env vars ile)
+  # ==========================================
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: deploy-api-gateway
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'api-gateway'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/api-gateway:$COMMIT_SHA'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'PUBSUB_PROJECT_ID=sentilyze-v5-clean'
+      - '--set-env-vars'
+      - 'GOOGLE_CLOUD_PROJECT=sentilyze-v5-clean'
+      - '--set-env-vars'
+      - 'CACHE_TYPE=firestore'
+    waitFor: ['push-api-gateway']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: deploy-ingestion
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'ingestion'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/ingestion:$COMMIT_SHA'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'PUBSUB_PROJECT_ID=sentilyze-v5-clean'
+      - '--set-env-vars'
+      - 'GOOGLE_CLOUD_PROJECT=sentilyze-v5-clean'
+      - '--set-env-vars'
+      - 'CACHE_TYPE=firestore'
+    waitFor: ['push-ingestion']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: deploy-sentiment-processor
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'sentiment-processor'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/sentiment-processor:$COMMIT_SHA'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'PUBSUB_PROJECT_ID=sentilyze-v5-clean'
+      - '--set-env-vars'
+      - 'GOOGLE_CLOUD_PROJECT=sentilyze-v5-clean'
+      - '--set-env-vars'
+      - 'CACHE_TYPE=firestore'
+    waitFor: ['push-sentiment-processor']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: deploy-market-context-processor
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'market-context-processor'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/market-context-processor:$COMMIT_SHA'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'PUBSUB_PROJECT_ID=sentilyze-v5-clean'
+      - '--set-env-vars'
+      - 'GOOGLE_CLOUD_PROJECT=sentilyze-v5-clean'
+      - '--set-env-vars'
+      - 'CACHE_TYPE=firestore'
+    waitFor: ['push-market-context-processor']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: deploy-prediction-engine
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'prediction-engine'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/prediction-engine:$COMMIT_SHA'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'PUBSUB_PROJECT_ID=sentilyze-v5-clean'
+      - '--set-env-vars'
+      - 'GOOGLE_CLOUD_PROJECT=sentilyze-v5-clean'
+      - '--set-env-vars'
+      - 'CACHE_TYPE=firestore'
+    waitFor: ['push-prediction-engine']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: deploy-alert-service
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'alert-service'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/alert-service:$COMMIT_SHA'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'PUBSUB_PROJECT_ID=sentilyze-v5-clean'
+      - '--set-env-vars'
+      - 'GOOGLE_CLOUD_PROJECT=sentilyze-v5-clean'
+      - '--set-env-vars'
+      - 'CACHE_TYPE=firestore'
+    waitFor: ['push-alert-service']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: deploy-tracker-service
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'tracker-service'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/tracker-service:$COMMIT_SHA'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'PUBSUB_PROJECT_ID=sentilyze-v5-clean'
+      - '--set-env-vars'
+      - 'GOOGLE_CLOUD_PROJECT=sentilyze-v5-clean'
+      - '--set-env-vars'
+      - 'CACHE_TYPE=firestore'
+    waitFor: ['push-tracker-service']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: deploy-analytics-engine
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'analytics-engine'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/analytics-engine:$COMMIT_SHA'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'PUBSUB_PROJECT_ID=sentilyze-v5-clean'
+      - '--set-env-vars'
+      - 'GOOGLE_CLOUD_PROJECT=sentilyze-v5-clean'
+      - '--set-env-vars'
+      - 'CACHE_TYPE=firestore'
+    waitFor: ['push-analytics-engine']
+
+  # ==========================================
+  # TRAFFIC PROMOTION STEPS
+  # ==========================================
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: promote-api-gateway
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'services'
+      - 'update-traffic'
+      - 'api-gateway'
+      - '--to-latest'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+    waitFor: ['deploy-api-gateway']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: promote-ingestion
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'services'
+      - 'update-traffic'
+      - 'ingestion'
+      - '--to-latest'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+    waitFor: ['deploy-ingestion']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: promote-sentiment-processor
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'services'
+      - 'update-traffic'
+      - 'sentiment-processor'
+      - '--to-latest'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+    waitFor: ['deploy-sentiment-processor']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: promote-market-context-processor
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'services'
+      - 'update-traffic'
+      - 'market-context-processor'
+      - '--to-latest'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+    waitFor: ['deploy-market-context-processor']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: promote-prediction-engine
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'services'
+      - 'update-traffic'
+      - 'prediction-engine'
+      - '--to-latest'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+    waitFor: ['deploy-prediction-engine']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: promote-alert-service
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'services'
+      - 'update-traffic'
+      - 'alert-service'
+      - '--to-latest'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+    waitFor: ['deploy-alert-service']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: promote-tracker-service
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'services'
+      - 'update-traffic'
+      - 'tracker-service'
+      - '--to-latest'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+    waitFor: ['deploy-tracker-service']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: promote-analytics-engine
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'services'
+      - 'update-traffic'
+      - 'analytics-engine'
+      - '--to-latest'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+    waitFor: ['deploy-analytics-engine']
+
+# ==========================================
+# OPTIONS
+# ==========================================
+options:
+  dynamic_substitutions: true
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
+  timeout: '1200s'
+
+# ==========================================
+# SUBSTITUTIONS
+# ==========================================
+substitutions:
+  _REGION: europe-west3
+  _REPO_NAME: sentilyze-repo

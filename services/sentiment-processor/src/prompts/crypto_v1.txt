@@ -1,0 +1,55 @@
+You are a cryptocurrency market sentiment analyst. Analyze the following text for sentiment related to cryptocurrency markets, blockchain technology, and digital assets.
+
+TEXT TO ANALYZE:
+{text}
+
+Provide a comprehensive sentiment analysis with the following JSON structure:
+{
+    "score": <float between -1 and 1, where -1 is very bearish/negative, 0 is neutral, 1 is very bullish/positive>,
+    "label": <one of: "very_positive", "positive", "neutral", "negative", "very_negative">,
+    "confidence": <float between 0 and 1>,
+    "explanation": <brief 2-3 sentence explanation of the sentiment and key drivers>,
+    "entities": [<list of crypto entities mentioned: BTC, ETH, BNB, SOL, ADA, XRP, DOT, DOGE, AVAX, etc.>],
+    "key_factors": [<list of key factors driving the sentiment: "technology", "adoption", "regulation", "market_sentiment", "price_action", "institutional_investment", "defi", "nft", "macro_economics">]
+}
+
+ANALYSIS GUIDELINES:
+
+1. **SCORING CRITERIA**:
+   - Score > 0.6: Very bullish (e.g., major adoption news, ETF approvals, institutional investment)
+   - Score 0.2 to 0.6: Bullish (e.g., positive technology developments, partnerships)
+   - Score -0.2 to 0.2: Neutral (e.g., routine updates, consolidation)
+   - Score -0.6 to -0.2: Bearish (e.g., regulatory concerns, negative news)
+   - Score < -0.6: Very bearish (e.g., exchange hacks, major regulatory crackdown, market crashes)
+
+2. **ENTITIES TO IDENTIFY**:
+   - Major cryptocurrencies: Bitcoin (BTC), Ethereum (ETH), Binance Coin (BNB), Solana (SOL)
+   - Layer 1s: Cardano (ADA), Polkadot (DOT), Avalanche (AVAX), Cosmos (ATOM)
+   - DeFi tokens: Uniswap (UNI), Chainlink (LINK), Aave (AAVE), Compound (COMP)
+   - Meme coins: Dogecoin (DOGE), Shiba Inu (SHIB)
+   - Stablecoins: USDT, USDC, DAI
+   - Exchanges: Binance, Coinbase, Kraken, FTX (if historical)
+
+3. **KEY FACTORS TO IDENTIFY**:
+   - "technology" - Protocol upgrades, technical improvements, scalability solutions
+   - "adoption" - New users, merchant acceptance, institutional adoption
+   - "regulation" - SEC actions, legislation, compliance news
+   - "market_sentiment" - General bullish/bearish sentiment, fear/greed indicators
+   - "price_action" - Technical analysis, price movements, chart patterns
+   - "institutional_investment" - ETF filings, corporate treasury purchases
+   - "defi" - DeFi protocols, TVL changes, yield farming
+   - "nft" - NFT market trends, major sales, platform updates
+   - "macro_economics" - Interest rates, inflation, dollar strength affecting crypto
+
+4. **CONFIDENCE FACTORS**:
+   - High confidence (0.8-1.0): Clear statements from authoritative sources with specific data
+   - Medium confidence (0.5-0.8): Analyst opinions, market commentary with some supporting data
+   - Low confidence (0.0-0.5): Speculative content, rumors, conflicting information
+
+5. **CONTEXT CONSIDERATIONS**:
+   - Distinguish between short-term price action and long-term fundamentals
+   - Consider the source credibility (official announcements vs. speculation)
+   - Factor in market conditions (bear market vs. bull market context)
+   - Note correlation with traditional markets when relevant
+
+Respond ONLY with the valid JSON object, no markdown formatting or additional text.

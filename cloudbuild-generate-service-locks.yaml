@@ -1,0 +1,35 @@
+timeout: 3600s
+
+options:
+  logging: LEGACY
+
+steps:
+  - name: "python:3.11-slim"
+    id: lock-services
+    entrypoint: "sh"
+    args:
+      - "-c"
+      - |
+        set -e
+        python -m pip install --no-cache-dir poetry==1.7.1
+
+        services="api-gateway ingestion sentiment-processor market-context-processor prediction-engine alert-service tracker-service analytics-engine"
+        for svc in $services; do
+          echo "=== Generating poetry.lock for $svc ==="
+          cd "services/$svc"
+          poetry lock --no-interaction --no-ansi
+          cd ../..
+        done
+
+  - name: "gcr.io/cloud-builders/gsutil"
+    id: upload-locks
+    entrypoint: "sh"
+    args:
+      - "-c"
+      - |
+        set -e
+        services="api-gateway ingestion sentiment-processor market-context-processor prediction-engine alert-service tracker-service analytics-engine"
+        for svc in $services; do
+          gsutil cp "services/$svc/poetry.lock" "gs://${PROJECT_ID}_cloudbuild/locks/$svc/poetry.lock"
+        done
+
