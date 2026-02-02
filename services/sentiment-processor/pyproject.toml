@@ -24,9 +24,18 @@ google-cloud-storage = "^2.14.0"
 google-cloud-firestore = "^2.14.0"
 
 [tool.poetry.group.lite.dependencies]
-# Optional dependency for Lite sentiment mode (Google Cloud Natural Language API)
-# Install with: `poetry install --with lite`
-google-cloud-language = "^2.19.0"
+# DEPRECATED: Optional dependency for Lite sentiment mode (Google Cloud Natural Language API)
+#
+# WARNING: DO NOT INSTALL - This dependency was causing ₺12,000+ monthly costs
+# The Cloud Natural Language API has been disabled in favor of free fallback responses
+#
+# If this package is in your poetry.lock:
+#   1. Remove [tool.poetry.group.lite.dependencies] section
+#   2. Run: poetry lock --no-update
+#   3. Run: poetry install
+#
+# Keeping here for reference only - DO NOT uncomment or install
+# google-cloud-language = "^2.19.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"

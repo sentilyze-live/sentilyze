@@ -134,17 +134,26 @@ class BaseSentimentAnalyzer(ABC):
         routing_path = "lite" if use_lite else "deep"
 
         if use_lite:
-            sentiment = await self._analyze_lite(event.content)
+            # NOTE: Cloud Natural Language API is disabled (too expensive)
+            # Use free neutral fallback instead
+            sentiment = self._create_fallback_result(
+                "Content below processing threshold (lite mode disabled for cost control)"
+            )
+            routing_path = "lite"
         else:
             try:
                 sentiment = await self._analyze_with_gemini(event.content)
             except (RateLimitError, ExternalServiceError) as e:
                 logger.warning(
-                    f"Gemini analysis failed; falling back to Lite sentiment",
+                    f"Gemini analysis failed; using neutral fallback (expensive Cloud NL API disabled)",
                     event_id=str(event.event_id),
                     error=str(e),
                 )
-                sentiment = await self._analyze_lite(event.content)
+                # CRITICAL: Do NOT use Cloud Natural Language API (too expensive)
+                # Use free neutral fallback instead
+                sentiment = self._create_fallback_result(
+                    f"Analysis temporarily unavailable: {str(e)}"
+                )
 
         # Normalize model used and routing path
         sentiment.routing_path = routing_path
@@ -170,62 +179,39 @@ class BaseSentimentAnalyzer(ABC):
         return len((text or "").strip()) <= max_chars if max_chars > 0 else False
 
     async def _analyze_lite(self, text: str) -> SentimentResult:
-        """Analyze sentiment using Google Cloud Natural Language API."""
-        cleaned = (text or "").strip()
-        if not cleaned:
-            return SentimentResult(
-                score=0.0,
-                label=SentimentLabel.NEUTRAL,
-                confidence=0.0,
-                explanation="Empty text",
-                model_used="google-nlp",
-            )
+        """DISABLED: Analyze sentiment using Google Cloud Natural Language API.
 
-        try:
-            return await asyncio.to_thread(self._analyze_lite_sync, cleaned[:5000])
-        except Exception as e:
-            raise ExternalServiceError(
-                f"Lite sentiment analysis failed: {e}",
-                service="natural_language",
-            ) from e
+        WARNING: Cloud Natural Language API is disabled due to cost (₺12,000+ monthly).
+        This method now returns a neutral fallback response.
+
+        History: This was causing ₺12,000+ in costs over 3 days when Gemini failed.
+        See .env.production SENTIMENT_LITE_MODE=false and SENTIMENT_LITE_MAX_CHARS=0
+        """
+        # ALWAYS return neutral fallback - never use expensive Cloud NL API
+        return SentimentResult(
+            score=0.0,
+            label=SentimentLabel.NEUTRAL,
+            confidence=0.0,
+            explanation="Lite sentiment analysis disabled (Cloud NL API too expensive)",
+            model_used="fallback-neutral",
+        )
 
     def _analyze_lite_sync(self, text: str) -> SentimentResult:
-        """Synchronous Natural Language API sentiment call."""
-        try:
-            from google.cloud import language_v1
-        except Exception as e:
-            raise ExternalServiceError(
-                f"google-cloud-language is not available: {e}",
-                service="natural_language",
-            ) from e
+        """DISABLED: Synchronous Natural Language API sentiment call.
 
-        if self._nl_client is None:
-            self._nl_client = language_v1.LanguageServiceClient()
+        CRITICAL: This method uses expensive Cloud Natural Language API and has been disabled.
+        Cost: ₺12,000+ in 3 days when fallback mechanism was active.
 
-        document = language_v1.Document(
-            content=text,
-            type_=language_v1.Document.Type.PLAIN_TEXT,
-        )
-        response = self._nl_client.analyze_sentiment(
-            request={
-                "document": document,
-                "encoding_type": language_v1.EncodingType.UTF8,
-            }
-        )
-
-        doc_sentiment = getattr(response, "document_sentiment", None)
-        score = float(getattr(doc_sentiment, "score", 0.0) if doc_sentiment is not None else 0.0)
-        score = max(-1.0, min(1.0, score))
-
-        label = self._label_from_score(score)
-        confidence = max(0.0, min(1.0, 0.5 + 0.5 * abs(score)))
-
-        return SentimentResult(
-            score=score,
-            label=label,
-            confidence=confidence,
-            explanation="Lite sentiment via Google Cloud Natural Language API",
-            model_used="google-nlp",
+        If you need to re-enable this:
+        1. Delete the override below
+        2. Set SENTIMENT_LITE_MODE=false in production
+        3. Ensure GOOGLE_CLOUD_LANGUAGE is installed (poetry install --with lite)
+        """
+        # Safety override: Never call expensive Cloud Natural Language API
+        raise RuntimeError(
+            "Cloud Natural Language API is disabled due to excessive costs (₺12,000+ in 3 days). "
+            "Use Gemini analysis or neutral fallback instead. "
+            "See analyzer_base.py comments for re-enabling instructions."
         )
 
     def _label_from_score(self, score: float) -> SentimentLabel:
