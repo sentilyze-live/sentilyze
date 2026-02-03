@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { gsap } from 'gsap';
-import { ArrowRight, TrendingUp, ChevronDown } from 'lucide-react';
+import { ArrowRight, TrendingUp, ChevronDown, Sparkles } from 'lucide-react';
 
 const Hero = () => {
   const heroRef = useRef<HTMLDivElement>(null);
@@ -53,7 +53,7 @@ const Hero = () => {
   return (
     <section
       ref={heroRef}
-      className="relative min-h-screen flex flex-col overflow-hidden"
+      className="relative min-h-screen flex flex-col overflow-hidden bg-[var(--bg-primary)]"
     >
       {/* Video Background */}
       <div className="absolute inset-0 z-0">
@@ -62,59 +62,102 @@ const Hero = () => {
           loop
           muted
           playsInline
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover opacity-30"
         >
-          <source src="/background.mp4" type="video/mp4" />
+          <source src="/aurora-background.mp4" type="video/mp4" />
         </video>
-        {/* Dark Overlay for better text readability */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70" />
-        {/* Additional gradient for depth */}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-transparent to-black/30" />
+        {/* Dark Overlay with Gold accent */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0A0E13]/95 via-[#0A0E13]/85 to-[#0A0E13]/95" />
+        {/* Gold glow effect */}
+        <div className="absolute inset-0 bg-gradient-radial from-[var(--gold-primary)]/5 via-transparent to-transparent" />
+      </div>
+
+      {/* Floating particles effect */}
+      <div className="absolute inset-0 z-[1] opacity-30">
+        <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-[var(--gold-primary)] rounded-full animate-pulse" />
+        <div className="absolute top-1/3 right-1/3 w-1 h-1 bg-[var(--gold-primary)] rounded-full animate-pulse delay-100" />
+        <div className="absolute bottom-1/3 left-1/3 w-1.5 h-1.5 bg-[var(--gold-primary)] rounded-full animate-pulse delay-200" />
       </div>
 
       {/* Main Hero Content */}
       <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="max-w-5xl mx-auto text-center relative">
+          {/* Premium Badge */}
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--gold-light)] border border-[var(--gold-primary)]/30 mb-6 backdrop-blur-sm">
+            <Sparkles className="w-4 h-4 text-[var(--gold-primary)]" />
+            <span className="text-sm font-semibold text-[var(--gold-primary)]">
+              AI-Powered Market Intelligence
+            </span>
+          </div>
+
           {/* Headline */}
           <h1
             ref={headlineRef}
             className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6"
             style={{ perspective: '1000px' }}
           >
-            <span className="hero-headline-line block text-white drop-shadow-lg">
-              Read Market
+            <span className="hero-headline-line block text-[var(--text-primary)] drop-shadow-2xl">
+              Altın Piyasasında
             </span>
-            <span className="hero-headline-line block bg-gradient-to-r from-blue-400 via-purple-400 to-blue-400 bg-clip-text text-transparent mt-2 drop-shadow-lg">
-              Sentiment with AI
+            <span className="hero-headline-line block bg-gradient-to-r from-[var(--gold-primary)] via-[var(--gold-hover)] to-[var(--gold-primary)] bg-clip-text text-transparent mt-2 drop-shadow-2xl animate-gradient">
+              Yapay Zeka ile Öngörü
             </span>
           </h1>
 
           {/* Subheadline */}
-          <p className="hero-subheadline text-lg sm:text-xl text-gray-200 max-w-2xl mx-auto mb-10 leading-relaxed drop-shadow-md">
-            Real-time sentiment analysis and price predictions for cryptocurrency and gold markets. 
-            Powered by Google Cloud&apos;s Vertex AI.
+          <p className="hero-subheadline text-lg sm:text-xl text-[var(--text-secondary)] max-w-2xl mx-auto mb-10 leading-relaxed">
+            Gerçek zamanlı sentiment analizi ve fiyat tahminleri ile altın piyasasını anlayın.
+            Google Cloud Vertex AI destekli profesyonel analiz platformu.
           </p>
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
             <a
-              href="#gold-analysis"
-              className="hero-cta-primary flex items-center gap-2 px-8 py-4 rounded-xl text-white font-semibold bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-400 hover:to-purple-500 transition-all duration-300 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:scale-105"
+              href="/app"
+              className="hero-cta-primary group flex items-center gap-2 px-8 py-4 rounded-xl font-semibold bg-gradient-to-r from-[var(--gold-primary)] to-[var(--gold-soft)] hover:from-[var(--gold-hover)] hover:to-[var(--gold-primary)] transition-all duration-300 shadow-lg hover:shadow-2xl hover:shadow-[var(--gold-primary)]/50 hover:scale-105 text-[var(--bg-primary)]"
             >
               <TrendingUp size={20} />
-              <span>Explore Analysis</span>
-              <ArrowRight size={18} className="ml-1" />
+              <span>Analize Başla</span>
+              <ArrowRight size={18} className="ml-1 group-hover:translate-x-1 transition-transform" />
             </a>
             <a
-              href="#how-it-works"
-              className="hero-cta-secondary flex items-center gap-2 px-8 py-4 rounded-xl font-semibold text-white border border-white/30 bg-white/10 backdrop-blur-md hover:bg-white/20 hover:border-white/50 transition-all duration-300"
+              href="#gold-analysis"
+              className="hero-cta-secondary flex items-center gap-2 px-8 py-4 rounded-xl font-semibold text-[var(--text-primary)] border border-[var(--border-color)] bg-[var(--bg-secondary)]/50 backdrop-blur-md hover:bg-[var(--bg-secondary)] hover:border-[var(--gold-primary)]/50 transition-all duration-300"
             >
-              <span>View Architecture</span>
+              <span>Detayları İncele</span>
             </a>
           </div>
 
+          {/* Stats Row */}
+          <div className="grid grid-cols-3 gap-4 sm:gap-8 max-w-3xl mx-auto mb-10">
+            <div className="hero-trust-badge bg-[var(--bg-secondary)]/50 backdrop-blur-md border border-[var(--border-color)] rounded-xl p-4">
+              <div className="text-2xl sm:text-3xl font-bold text-[var(--gold-primary)] mb-1">
+                99.2%
+              </div>
+              <div className="text-xs sm:text-sm text-[var(--text-muted)]">
+                API Uptime
+              </div>
+            </div>
+            <div className="hero-trust-badge bg-[var(--bg-secondary)]/50 backdrop-blur-md border border-[var(--border-color)] rounded-xl p-4">
+              <div className="text-2xl sm:text-3xl font-bold text-[var(--gold-primary)] mb-1">
+                24/7
+              </div>
+              <div className="text-xs sm:text-sm text-[var(--text-muted)]">
+                Canlı Analiz
+              </div>
+            </div>
+            <div className="hero-trust-badge bg-[var(--bg-secondary)]/50 backdrop-blur-md border border-[var(--border-color)] rounded-xl p-4">
+              <div className="text-2xl sm:text-3xl font-bold text-[var(--gold-primary)] mb-1">
+                AI
+              </div>
+              <div className="text-xs sm:text-sm text-[var(--text-muted)]">
+                Powered
+              </div>
+            </div>
+          </div>
+
           {/* Google Cloud Startup Program Badge */}
-          <div className="hero-trust-badge inline-flex items-center gap-3 px-5 py-3 rounded-xl bg-black/40 border border-white/20 backdrop-blur-md">
+          <div className="hero-trust-badge inline-flex items-center gap-3 px-5 py-3 rounded-xl bg-[var(--bg-secondary)]/50 border border-[var(--border-color)] backdrop-blur-md hover:bg-[var(--bg-secondary)] hover:border-[var(--gold-primary)]/30 transition-all duration-300">
             <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center">
               <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
                 <path
@@ -124,8 +167,8 @@ const Hero = () => {
               </svg>
             </div>
             <div className="text-left">
-              <p className="text-xs text-gray-300">Member of</p>
-              <p className="text-sm font-semibold text-white">
+              <p className="text-xs text-[var(--text-muted)]">Üyesi</p>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">
                 Google Cloud Startup Program
               </p>
             </div>
@@ -134,10 +177,13 @@ const Hero = () => {
       </div>
 
       {/* Scroll Indicator */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/70 z-10">
-        <span className="text-xs uppercase tracking-wider drop-shadow-md">Scroll to explore</span>
-        <ChevronDown size={20} className="animate-bounce" />
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-[var(--text-muted)] z-10">
+        <span className="text-xs uppercase tracking-wider">Keşfetmeye Devam Et</span>
+        <ChevronDown size={20} className="animate-bounce text-[var(--gold-primary)]" />
       </div>
+
+      {/* Bottom gradient fade */}
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[var(--bg-primary)] to-transparent z-[2]" />
     </section>
   );
 };

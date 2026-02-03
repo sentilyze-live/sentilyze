@@ -40,25 +40,25 @@ const Navigation = ({ isLightMode, onThemeToggle }: NavigationProps) => {
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         isScrolled
-          ? 'bg-black/60 backdrop-blur-xl border-b border-white/10 py-3'
+          ? 'bg-[var(--bg-primary)]/80 backdrop-blur-xl border-b border-[var(--border-color)] py-3'
           : 'bg-transparent py-5'
       }`}
     >
       <div className="section-container max-w-7xl mx-auto">
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <a 
-            href="#" 
+          <a
+            href="#"
             className="flex items-center gap-2 group"
             onClick={(e) => {
               e.preventDefault();
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
           >
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center transition-transform duration-300 group-hover:scale-110">
-              <span className="text-white font-bold text-sm">S</span>
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--gold-primary)] to-[var(--gold-soft)] flex items-center justify-center transition-transform duration-300 group-hover:scale-110 shadow-lg shadow-[var(--gold-primary)]/20">
+              <span className="text-[var(--bg-primary)] font-bold text-sm">S</span>
             </div>
-            <span className="text-lg font-semibold text-white group-hover:text-blue-400 transition-colors drop-shadow-md">
+            <span className="text-lg font-semibold text-[var(--text-primary)] group-hover:text-[var(--gold-primary)] transition-colors drop-shadow-md">
               Sentilyze
             </span>
           </a>
@@ -69,10 +69,10 @@ const Navigation = ({ isLightMode, onThemeToggle }: NavigationProps) => {
               <button
                 key={link.href}
                 onClick={() => scrollToSection(link.href)}
-                className="text-sm text-gray-300 hover:text-white transition-colors relative group drop-shadow-md"
+                className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors relative group drop-shadow-md"
               >
                 {link.label}
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-400 transition-all duration-300 group-hover:w-full" />
+                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-[var(--gold-primary)] transition-all duration-300 group-hover:w-full" />
               </button>
             ))}
           </div>
@@ -82,7 +82,7 @@ const Navigation = ({ isLightMode, onThemeToggle }: NavigationProps) => {
             {/* Theme Toggle */}
             <button
               onClick={onThemeToggle}
-              className="p-2 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-all"
+              className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all"
               aria-label="Toggle theme"
             >
               {isLightMode ? <Moon size={18} /> : <Sun size={18} />}
@@ -91,16 +91,16 @@ const Navigation = ({ isLightMode, onThemeToggle }: NavigationProps) => {
             {/* Dashboard Button - Redirects to /app */}
             <button
               onClick={() => navigate('/app')}
-              className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-lg border border-blue-400/50 text-blue-400 hover:bg-blue-400/10 transition-all"
+              className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--gold-primary)]/50 text-[var(--gold-primary)] hover:bg-[var(--gold-light)] hover:border-[var(--gold-primary)] transition-all font-medium"
             >
               <LayoutDashboard size={16} />
-              <span className="text-sm font-medium">Dashboard</span>
+              <span className="text-sm">Dashboard</span>
             </button>
 
             {/* Mobile Menu Button */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-all"
+              className="md:hidden p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all"
               aria-label="Toggle menu"
             >
               {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -110,13 +110,13 @@ const Navigation = ({ isLightMode, onThemeToggle }: NavigationProps) => {
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <div className="md:hidden mt-4 py-4 border-t border-white/10 bg-black/40 backdrop-blur-xl rounded-lg">
+          <div className="md:hidden mt-4 py-4 border-t border-[var(--border-color)] bg-[var(--bg-secondary)]/90 backdrop-blur-xl rounded-lg">
             <div className="flex flex-col gap-4 px-4">
               {navLinks.map((link) => (
                 <button
                   key={link.href}
                   onClick={() => scrollToSection(link.href)}
-                  className="text-left text-gray-300 hover:text-white transition-colors py-2"
+                  className="text-left text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors py-2"
                 >
                   {link.label}
                 </button>
@@ -126,10 +126,10 @@ const Navigation = ({ isLightMode, onThemeToggle }: NavigationProps) => {
                   navigate('/app');
                   setIsMobileMenuOpen(false);
                 }}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-blue-400/50 text-blue-400 hover:bg-blue-400/10 transition-all mt-2"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--gold-primary)]/50 text-[var(--gold-primary)] hover:bg-[var(--gold-light)] transition-all mt-2 font-medium"
               >
                 <LayoutDashboard size={16} />
-                <span className="text-sm font-medium">Dashboard</span>
+                <span className="text-sm">Dashboard</span>
               </button>
             </div>
           </div>
