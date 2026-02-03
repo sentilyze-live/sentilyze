@@ -70,10 +70,10 @@ const Footer = () => {
   ];
 
   const footerLinks = [
-    { label: 'Gizlilik Politikası', href: '#' },
-    { label: 'Kullanım Şartları', href: '#' },
-    { label: 'Risk Bildirimi', href: '#' },
-    { label: 'İletişim', href: '#' },
+    { label: 'Privacy Policy', href: '#' },
+    { label: 'Terms of Service', href: '#' },
+    { label: 'Risk Disclosure', href: '#' },
+    { label: 'Contact', href: '#' },
   ];
 
   return (
@@ -119,10 +119,10 @@ const Footer = () => {
 
           {/* Tagline */}
           <p className="text-[var(--cool-gray)] mb-2">
-            AI Destekli Pazar Duygu Analizi Platformu
+            AI-Powered Market Sentiment Analysis
           </p>
           <p className="text-xs text-[var(--disabled-gray)] mb-8">
-            Yatırım Danışmanlığı Değildir - Bilgilendirme Amaçlıdır
+            Not Investment Advice - For Informational Purposes
           </p>
 
           {/* Social Links */}
@@ -155,7 +155,7 @@ const Footer = () => {
 
           {/* Copyright */}
           <p className="text-xs text-[var(--disabled-gray)]">
-            &copy; {new Date().getFullYear()} Sentilyze. Tüm hakları saklıdır.
+            &copy; {new Date().getFullYear()} Sentilyze. All rights reserved.
           </p>
           <p className="text-xs text-[var(--disabled-gray)] mt-1">
             Bu platform 6362 sayılı SPK Kanunu kapsamında yatırım danışmanlığı faaliyeti yürütmemektedir.

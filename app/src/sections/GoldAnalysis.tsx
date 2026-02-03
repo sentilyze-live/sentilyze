@@ -266,17 +266,17 @@ const GoldAnalysis = () => {
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--gold-accent)]/10 border border-[var(--gold-accent)]/20 mb-4">
             <Activity size={14} className="text-[var(--gold-accent)]" />
             <span className="text-xs font-medium text-[var(--gold-accent)] uppercase tracking-wider">
-              Canlı Analiz
+              Live Analysis
             </span>
           </div>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-[var(--soft-white)] mb-4">
-            Altın <span className="gold-gradient-text">(XAU/USD)</span> Pazar İstihbaratı
+            Gold <span className="gold-gradient-text">(XAU/USD)</span> Market Intelligence
           </h2>
           <p className="text-lg text-[var(--cool-gray)] max-w-2xl mx-auto">
-            Gerçek zamanlı duygu analizi ve AI destekli senaryo analizleri
+            Real-time sentiment analysis and AI-powered scenario predictions
           </p>
           <p className="text-sm text-[var(--disabled-gray)] mt-2 italic">
-            ⚠️ Bilgilendirme amaçlıdır - Yatırım tavsiyesi değildir
+            ⚠️ For informational purposes only - Not investment advice
           </p>
         </div>
 

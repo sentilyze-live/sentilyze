@@ -27,7 +27,24 @@
     --gold-soft: #B89B2E;
     --gold-hover: #E6C75A;
     --gold-light: rgba(212, 175, 55, 0.15);
-    
+
+    /* Aurora Colors (Landing Page Theme) */
+    --aurora-primary: #2FE4FF;
+    --aurora-purple: #9D4EDD;
+    --aurora-blue: #4EA8DE;
+    --aurora-cyan: #48CAE4;
+    --aurora-green: #4DFFB8;
+    --aurora-pink: #F72585;
+    --aurora-soft: #90E0EF;
+    --aurora-hover: #00F5FF;
+    --aurora-light: rgba(47, 228, 255, 0.15);
+    --aurora-bg-primary: #0A0E17;
+    --aurora-bg-secondary: #0F1419;
+    --aurora-bg-tertiary: #1A1F2E;
+    --aurora-text-primary: #E8F4F8;
+    --aurora-text-secondary: #ADE8F4;
+    --aurora-text-muted: #90BCC9;
+
     /* Sentiment Colors */
     --market-up: #2ECC71;
     --market-up-light: rgba(46, 204, 113, 0.15);
@@ -130,6 +147,27 @@
     --border: 220 15% 88%;
     --input: 220 15% 88%;
     --ring: 43 70% 47%;
+  }
+
+  /* ============================================
+     AURORA THEME OVERRIDE - Landing Page
+     ============================================ */
+  :root[data-landing-theme="aurora"] {
+    /* Override gold with aurora for landing */
+    --gold-primary: var(--aurora-primary);
+    --gold-soft: var(--aurora-soft);
+    --gold-hover: var(--aurora-hover);
+    --gold-light: var(--aurora-light);
+
+    /* Background overrides */
+    --bg-primary: var(--aurora-bg-primary);
+    --bg-secondary: var(--aurora-bg-secondary);
+    --bg-tertiary: var(--aurora-bg-tertiary);
+
+    /* Text overrides */
+    --text-primary: var(--aurora-text-primary);
+    --text-secondary: var(--aurora-text-secondary);
+    --text-muted: var(--aurora-text-muted);
   }
 }
 

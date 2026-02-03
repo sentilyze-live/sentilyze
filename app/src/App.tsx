@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { Toaster } from 'sonner';
 import Navigation from './sections/Navigation';
 import Hero from './sections/Hero';
 import HowItWorks from './sections/HowItWorks';
@@ -22,12 +23,24 @@ import './App.css';
 
 gsap.registerPlugin(ScrollTrigger);
 
+// Skip to content link for accessibility
+const SkipToContent: React.FC = () => {
+  return (
+    <a
+      href="#main-content"
+      className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-blue-500 focus:text-white focus:rounded-lg"
+    >
+      Ana içeriğe atla
+    </a>
+  );
+};
+
 const GoldDashboard: React.FC = () => {
   return (
     <DashboardLayout>
-      <div className="min-h-screen bg-[#0B0F14]">
+      <div className="min-h-screen bg-[var(--bg-primary)]">
         <GoldHeader />
-        <div className="p-6">
+        <main id="main-content" className="p-6">
           <PriceTable />
           <PredictionTable />
           <GoldChart />
@@ -37,7 +50,7 @@ const GoldDashboard: React.FC = () => {
             <NewsFeed />
           </div>
           <SpikeAnalysis />
-        </div>
+        </main>
       </div>
     </DashboardLayout>
   );
@@ -46,6 +59,15 @@ const GoldDashboard: React.FC = () => {
 const LandingPage: React.FC = () => {
   const [isLightMode, setIsLightMode] = useState(false);
   const mainRef = useRef<HTMLDivElement>(null);
+
+  // Apply aurora theme for landing page
+  useEffect(() => {
+    document.documentElement.setAttribute('data-landing-theme', 'aurora');
+
+    return () => {
+      document.documentElement.removeAttribute('data-landing-theme');
+    };
+  }, []);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -78,12 +100,13 @@ const LandingPage: React.FC = () => {
 
   return (
     <div ref={mainRef} className="min-h-screen bg-[var(--void-black)]">
+      <SkipToContent />
       <Navigation 
         isLightMode={isLightMode}
         onThemeToggle={toggleTheme}
       />
       
-      <main>
+      <main id="main-content">
         <Hero />
         <HowItWorks />
         <GoogleCloud />
@@ -99,6 +122,16 @@ const LandingPage: React.FC = () => {
 function App() {
   return (
     <BrowserRouter>
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          style: {
+            background: 'var(--bg-card)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border-color)',
+          },
+        }}
+      />
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/app" element={<GoldDashboard />} />
