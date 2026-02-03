@@ -1,92 +1,214 @@
 import React, { useEffect, useState } from 'react';
-import { getRealGoldPrice } from '../../lib/api/realApi';
+import { getAllPrices, type ForexRate } from '../../lib/api/finnhubApi';
+import { TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
 
-interface PriceData {
-  name: string;
-  buy: string;
-  sell: string;
-  isGold?: boolean;
+interface PriceCardProps {
+  title: string;
+  subtitle: string;
+  buyPrice: number | null;
+  sellPrice: number | null;
+  change: number | null;
+  changePercent: number | null;
+  isLoading: boolean;
 }
 
+const PriceCard: React.FC<PriceCardProps> = ({
+  title,
+  subtitle,
+  buyPrice,
+  sellPrice,
+  change,
+  changePercent,
+  isLoading,
+}) => {
+  const isPositive = (change || 0) >= 0;
+  const displayBuy = buyPrice?.toFixed(2) || '---';
+  const displaySell = sellPrice?.toFixed(2) || '---';
+
+  return (
+    <div className="risk-card p-4 hover:shadow-lg transition-shadow duration-300">
+      <div className="flex items-start justify-between mb-3">
+        <div>
+          <h3 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
+            {title}
+          </h3>
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">{subtitle}</p>
+        </div>
+        {changePercent !== null && (
+          <div className={`flex items-center gap-1 px-2 py-1 rounded-full ${
+            isPositive ? 'bg-[var(--market-up-light)]' : 'bg-[var(--market-down-light)]'
+          }`}>
+            {isPositive ? (
+              <TrendingUp className={`w-3 h-3 price-bullish`} />
+            ) : (
+              <TrendingDown className={`w-3 h-3 price-bearish`} />
+            )}
+            <span className={`text-xs font-bold ${isPositive ? 'price-bullish' : 'price-bearish'}`}>
+              {isPositive ? '+' : ''}{changePercent.toFixed(2)}%
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-[var(--bg-tertiary)] rounded-lg p-3">
+          <p className="text-xs text-[var(--text-muted)] mb-1 font-medium">Alış</p>
+          {isLoading ? (
+            <div className="h-7 bg-[var(--bg-hover)] animate-pulse rounded"></div>
+          ) : (
+            <p className="text-xl font-bold price-bullish font-mono">{displayBuy}</p>
+          )}
+        </div>
+        <div className="bg-[var(--bg-tertiary)] rounded-lg p-3">
+          <p className="text-xs text-[var(--text-muted)] mb-1 font-medium">Satış</p>
+          {isLoading ? (
+            <div className="h-7 bg-[var(--bg-hover)] animate-pulse rounded"></div>
+          ) : (
+            <p className="text-xl font-bold price-bearish font-mono">{displaySell}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const PriceTable: React.FC = () => {
-  const [goldPrice, setGoldPrice] = useState<number | null>(null);
+  const [prices, setPrices] = useState<{
+    gold: ForexRate | null;
+    usdtry: ForexRate | null;
+    eurtry: ForexRate | null;
+  }>({
+    gold: null,
+    usdtry: null,
+    eurtry: null,
+  });
   const [isLoading, setIsLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const fetchPrices = async () => {
+    try {
+      setIsLoading(true);
+      const data = await getAllPrices();
+      setPrices(data);
+      setLastUpdated(new Date());
+    } catch (error) {
+      console.error('Failed to fetch prices:', error);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchPrice = async () => {
-      try {
-        setIsLoading(true);
-        const price = await getRealGoldPrice();
-        if (price) {
-          setGoldPrice(price.price);
-        }
-      } catch (error) {
-        console.error('Failed to fetch gold price:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchPrice();
-    const interval = setInterval(fetchPrice, 30000);
+    fetchPrices();
+    const interval = setInterval(fetchPrices, 60000); // Update every minute
     return () => clearInterval(interval);
   }, []);
 
-  const defaultPriceData: PriceData[] = [
-    { name: 'Altın (Gram)', buy: '2,847.45', sell: '2,852.30', isGold: true },
-    { name: 'Ons Altın', buy: '2,785.00', sell: '2,790.00' },
-    { name: 'USD/TL', buy: '32.45', sell: '32.55' },
-    { name: 'EUR/TL', buy: '35.20', sell: '35.40' },
-  ];
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    fetchPrices();
+  };
 
-  const displayData = goldPrice 
-    ? [
-      { name: 'Altın (Ons)', buy: goldPrice.toFixed(2), sell: (goldPrice + 5).toFixed(2), isGold: true },
-      ...defaultPriceData.slice(1),
-    ]
-    : defaultPriceData;
+  const formatTimeAgo = (date: Date) => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+
+    if (diffSecs < 60) return 'Az önce';
+    if (diffMins < 60) return `${diffMins} dk önce`;
+    return date.toLocaleTimeString('tr-TR');
+  };
+
+  // Calculate gram gold price from ounce (1 oz = 31.1035 gram)
+  const gramGoldPrice = prices.gold && prices.usdtry
+    ? (prices.gold.price / 31.1035) * prices.usdtry.price
+    : null;
+
+  const gramGoldBuy = gramGoldPrice ? gramGoldPrice * 0.995 : null;
+  const gramGoldSell = gramGoldPrice ? gramGoldPrice * 1.005 : null;
 
   return (
-    <div className="glass-card p-6 mb-6">
-      <h2 className="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
-        <span className="text-2xl">📈</span> ALTIN FİYATLARI
-      </h2>
-      
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-[#1F2A38]">
-              <th className="text-left py-3 px-4 text-[#9AA4B2] font-semibold text-sm">Bilgi amaçlıdır</th>
-              <th className="text-center py-3 px-4 text-[#9AA4B2] font-semibold text-sm">Alış</th>
-              <th className="text-center py-3 px-4 text-[#9AA4B2] font-semibold text-sm">Satış</th>
-            </tr>
-          </thead>
-          <tbody>
-            {displayData.map((item, index) => (
-              <tr 
-                key={item.name}
-                className={`border-b border-[#1F2A38]/50 hover:bg-[#1A2230]/50 transition-colors ${
-                  index === displayData.length - 1 ? 'border-b-0' : ''
-                }`}
-              >
-                <td className={`py-4 px-4 ${item.isGold ? 'text-lg font-bold text-blue-400' : 'text-base font-medium text-[#E6EDF3]'}`}>
-                  {item.name}
-                </td>
-                <td className={`py-4 px-4 text-center font-mono ${item.isGold ? 'text-lg font-bold text-emerald-400' : 'text-base text-emerald-400'}`}>
-                  {item.buy}
-                </td>
-                <td className={`py-4 px-4 text-center font-mono ${item.isGold ? 'text-lg font-bold text-rose-400' : 'text-base text-rose-400'}`}>
-                  {item.sell}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <div className="mb-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[var(--gold-primary)] to-[var(--gold-soft)] flex items-center justify-center">
+            <span className="text-xl">💰</span>
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-[var(--text-primary)]">
+              Canlı Fiyatlar
+            </h2>
+            <p className="text-sm text-[var(--text-muted)]">
+              Son güncelleme: {formatTimeAgo(lastUpdated)}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className={`p-2.5 rounded-lg bg-[var(--bg-tertiary)] hover:bg-[var(--gold-light)] hover:text-[var(--gold-primary)] text-[var(--text-secondary)] transition-all duration-200 ${
+            isRefreshing ? 'animate-spin' : ''
+          }`}
+          aria-label="Fiyatları yenile"
+        >
+          <RefreshCw className="w-5 h-5" />
+        </button>
       </div>
-      
-      <p className="text-xs text-[#5F6B7A] mt-3 text-center">
-        {isLoading ? 'Fiyatlar yükleniyor...' : 'Veriler canlı kaynaklardan alınmaktadır.'}
-      </p>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <PriceCard
+          title="Altın (Gram)"
+          subtitle="TL Bazlı"
+          buyPrice={gramGoldBuy}
+          sellPrice={gramGoldSell}
+          change={prices.gold?.change || null}
+          changePercent={prices.gold?.changePercent || null}
+          isLoading={isLoading}
+        />
+
+        <PriceCard
+          title="Ons Altın"
+          subtitle="XAU/USD"
+          buyPrice={prices.gold ? prices.gold.price * 0.998 : null}
+          sellPrice={prices.gold ? prices.gold.price * 1.002 : null}
+          change={prices.gold?.change || null}
+          changePercent={prices.gold?.changePercent || null}
+          isLoading={isLoading}
+        />
+
+        <PriceCard
+          title="USD/TL"
+          subtitle="Amerikan Doları"
+          buyPrice={prices.usdtry ? prices.usdtry.price * 0.999 : null}
+          sellPrice={prices.usdtry ? prices.usdtry.price * 1.001 : null}
+          change={prices.usdtry?.change || null}
+          changePercent={prices.usdtry?.changePercent || null}
+          isLoading={isLoading}
+        />
+
+        <PriceCard
+          title="EUR/TL"
+          subtitle="Euro"
+          buyPrice={prices.eurtry ? prices.eurtry.price * 0.999 : null}
+          sellPrice={prices.eurtry ? prices.eurtry.price * 1.001 : null}
+          change={prices.eurtry?.change || null}
+          changePercent={prices.eurtry?.changePercent || null}
+          isLoading={isLoading}
+        />
+      </div>
+
+      <div className="mt-4 p-3 bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg">
+        <div className="flex items-start gap-2 text-xs text-[var(--text-muted)]">
+          <span className="text-yellow-500">⚠️</span>
+          <p>
+            <strong className="text-[var(--text-secondary)]">Yasal Uyarı:</strong> Bu fiyatlar yalnızca bilgi amaçlıdır ve yatırım tavsiyesi niteliği taşımaz.
+            Gerçek işlem fiyatları piyasa koşullarına göre değişiklik gösterebilir. Finnhub API kullanılarak sağlanmaktadır.
+          </p>
+        </div>
+      </div>
     </div>
   );
 };
