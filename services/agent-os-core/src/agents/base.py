@@ -2,22 +2,29 @@
 
 import uuid
 from abc import ABC, abstractmethod
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Set
 
 import structlog
 
-from src.api import HiggsfieldClient, KimiClient
+from src.api import HiggsfieldClient, KimiClient, VertexAIClient
 from src.config import settings
 from src.data_bridge import BigQueryDataClient, FirestoreDataClient, PubSubDataClient
 from src.memory import StructuredMemory, TaskState, DailyActivity
 from src.utils import TelegramNotifier
+from src.utils.telegram_manager import get_telegram_manager
 
 logger = structlog.get_logger(__name__)
 
 
 class BaseAgent(ABC):
     """Base class for all agents in the Agent OS system."""
+    
+    # Class-level tracking to prevent notification spam across all agents
+    _last_error_notifications: Dict[str, datetime] = {}
+    _error_counts: Dict[str, int] = {}
+    _notification_cooldown = timedelta(minutes=15)  # 15 minutes between notifications
+    _max_notifications_per_hour = 4  # Max 4 notifications per hour per agent
 
     def __init__(
         self,
@@ -40,12 +47,16 @@ class BaseAgent(ABC):
         # Initialize Kimi client with agent-specific model configuration
         self.kimi = self._initialize_kimi_client()
         self.telegram = TelegramNotifier()
+        self.telegram_manager = get_telegram_manager()  # New unified manager
         self.bigquery = BigQueryDataClient()
         self.firestore = FirestoreDataClient()
         self.pubsub = PubSubDataClient()
-        
+
         # Initialize structured memory (WORKING.md style)
         self.memory = StructuredMemory(agent_name=agent_type)
+
+        # Telegram context (set when agent is triggered via Telegram)
+        self.telegram_context: Optional[Dict[str, Any]] = None
 
         # Higgsfield client (only for Ece agent typically)
         self.higgsfield: Optional[HiggsfieldClient] = None
@@ -70,6 +81,7 @@ class BaseAgent(ABC):
         - SCOUT & ORACLE: kimi-k2-thinking (deep reasoning)
         - SETH & ZARA: kimi-k2-0905-preview (coding/JSON, cost-effective)
         - ELON: kimi-k2-0905-preview (speed vs cost balance)
+        - MARIA: Uses Vertex AI as fallback when MOONSHOT_API_KEY is not set
         
         Returns:
             Configured KimiClient instance
@@ -103,10 +115,31 @@ class BaseAgent(ABC):
                 "max_tokens": settings.MOONSHOT_MAX_TOKENS_ELON,
                 "temperature": settings.MOONSHOT_TEMPERATURE_ELON,
             },
+            "maria": {
+                "model": settings.MOONSHOT_MODEL,
+                "max_tokens": settings.MOONSHOT_MAX_TOKENS,
+                "temperature": settings.MOONSHOT_TEMPERATURE,
+            },
         }
         
         # Get config for this agent or use defaults
         config = model_config_map.get(agent_type, {})
+        
+        # Check if we should use Vertex AI (for MARIA when MOONSHOT_API_KEY is missing)
+        use_vertex_ai = settings.ENABLE_VERTEX_AI_FOR_AGENTS and not settings.MOONSHOT_API_KEY
+        
+        if use_vertex_ai and agent_type == "maria":
+            logger.info(
+                "kimi_client.using_vertex_ai_fallback",
+                agent_type=agent_type,
+                reason="MOONSHOT_API_KEY not set",
+            )
+            # Return a KimiClient that uses Vertex AI internally
+            return KimiClient(
+                model=config.get("model"),
+                max_tokens=config.get("max_tokens"),
+                temperature=config.get("temperature"),
+            )
         
         logger.info(
             "kimi_client.initializing_for_agent",
@@ -134,11 +167,22 @@ class BaseAgent(ABC):
         start_time = datetime.utcnow()
         run_id = str(uuid.uuid4())
 
-        logger.info(
-            "agent.run_started",
-            agent_type=self.agent_type,
-            run_id=run_id,
-        )
+        # Check if this is a Telegram-triggered run
+        if context and context.get("telegram_enabled"):
+            self.telegram_context = context
+            logger.info(
+                "agent.run_started_telegram",
+                agent_type=self.agent_type,
+                run_id=run_id,
+                user=context.get("telegram_username"),
+            )
+        else:
+            self.telegram_context = None
+            logger.info(
+                "agent.run_started",
+                agent_type=self.agent_type,
+                run_id=run_id,
+            )
 
         try:
             # Pre-run setup
@@ -190,12 +234,19 @@ class BaseAgent(ABC):
                 duration=duration,
             )
 
-            # Notify error
-            await self.telegram.send_error_alert(
-                agent_name=self.name,
-                error=str(e),
-                context={"run_id": run_id, "duration": duration},
-            )
+            # Notify error only if cooldown has passed
+            if self._should_send_error_notification():
+                error_count = self._error_counts.get(self.agent_type, 0)
+                await self.telegram.send_error_alert(
+                    agent_name=self.name,
+                    error=str(e),
+                    context={
+                        "run_id": run_id, 
+                        "duration": duration,
+                        "recent_error_count": error_count,
+                    },
+                )
+                self._last_error_notifications[self.agent_type] = datetime.utcnow()
 
             return {
                 "success": False,
@@ -204,6 +255,44 @@ class BaseAgent(ABC):
                 "duration_seconds": duration,
                 "error": str(e),
             }
+
+    def _should_send_error_notification(self) -> bool:
+        """Check if we should send an error notification based on cooldown.
+        
+        Returns:
+            True if notification should be sent, False otherwise
+        """
+        now = datetime.utcnow()
+        agent_type = self.agent_type
+        
+        # Get last notification time
+        last_notification = self._last_error_notifications.get(agent_type)
+        
+        if last_notification is None:
+            # Never sent before, send now
+            self._error_counts[agent_type] = 1
+            return True
+        
+        # Check if cooldown has passed
+        time_since_last = now - last_notification
+        if time_since_last >= self._notification_cooldown:
+            # Cooldown passed, reset counter
+            self._error_counts[agent_type] = 1
+            return True
+        
+        # Still in cooldown, increment counter
+        self._error_counts[agent_type] = self._error_counts.get(agent_type, 0) + 1
+        
+        # Only log that we're skipping notification (not sending Telegram)
+        if self._error_counts[agent_type] <= 3:  # Log first few suppressions
+            logger.warning(
+                "agent.error_notification_suppressed",
+                agent_type=agent_type,
+                error_count=self._error_counts[agent_type],
+                cooldown_remaining_seconds=(self._notification_cooldown - time_since_last).total_seconds(),
+            )
+        
+        return False
 
     @abstractmethod
     async def _execute(self, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
@@ -447,11 +536,94 @@ class BaseAgent(ABC):
     
     async def get_memory_context(self) -> Dict[str, Any]:
         """Get full memory context for this agent.
-        
+
         Returns:
             Dictionary with working, daily, and long-term memory
         """
         return await self.memory.get_full_context()
+
+    # ═══════════════════════════════════════════════════════════════════
+    # Telegram Integration Methods
+    # ═══════════════════════════════════════════════════════════════════
+
+    async def reply_to_telegram(self, message: str) -> bool:
+        """Reply to Telegram user who triggered this agent.
+
+        Only works if agent was triggered via Telegram.
+        Automatically sends to the correct chat.
+
+        Args:
+            message: Message to send
+
+        Returns:
+            True if sent successfully, False otherwise
+
+        Example:
+            ```python
+            if self.telegram_context:
+                await self.reply_to_telegram("✅ Analysis complete! Found 5 opportunities.")
+            ```
+        """
+        if not self.telegram_context:
+            logger.debug("agent.reply_skipped", reason="not_telegram_triggered")
+            return False
+
+        chat_id = self.telegram_context.get("telegram_chat_id")
+        if not chat_id:
+            logger.warning("agent.reply_failed", reason="no_chat_id")
+            return False
+
+        try:
+            # Add agent signature
+            formatted_message = f"🤖 <b>{self.name}</b>\n\n{message}"
+
+            # Send via telegram manager
+            result = await self.telegram_manager.send_message(
+                text=formatted_message,
+                chat_id=chat_id,
+            )
+
+            success = result.get("ok", False)
+            if success:
+                logger.info("agent.telegram_reply_sent", agent=self.agent_type)
+            else:
+                logger.error("agent.telegram_reply_failed", error=result.get("error"))
+
+            return success
+
+        except Exception as e:
+            logger.error("agent.telegram_reply_error", error=str(e))
+            return False
+
+    def is_telegram_triggered(self) -> bool:
+        """Check if this agent run was triggered via Telegram.
+
+        Returns:
+            True if triggered via Telegram, False otherwise
+        """
+        return bool(self.telegram_context and self.telegram_context.get("telegram_enabled"))
+
+    def get_telegram_user(self) -> Optional[str]:
+        """Get Telegram username who triggered this run.
+
+        Returns:
+            Username or None
+        """
+        if not self.telegram_context:
+            return None
+        return self.telegram_context.get("telegram_username")
+
+    def get_telegram_task(self) -> Optional[str]:
+        """Get task description from Telegram message.
+
+        Returns:
+            Task description or None
+        """
+        if not self.telegram_context:
+            return None
+        return self.telegram_context.get("task")
+
+    # ═══════════════════════════════════════════════════════════════════
 
     def get_info(self) -> Dict[str, Any]:
         """Get agent information.
