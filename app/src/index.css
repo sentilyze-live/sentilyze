@@ -6,94 +6,130 @@
 
 @layer base {
   :root {
-    /* Sentilyze Dark Theme - Default */
-    --background: 210 25% 5%;
-    --foreground: 210 20% 93%;
-    --card: 213 24% 9%;
-    --card-foreground: 210 20% 93%;
-    --popover: 213 24% 9%;
-    --popover-foreground: 210 20% 93%;
-    --primary: 187 100% 59%;
-    --primary-foreground: 210 25% 5%;
-    --secondary: 150 100% 65%;
-    --secondary-foreground: 210 25% 5%;
-    --muted: 213 20% 15%;
-    --muted-foreground: 213 15% 55%;
-    --accent: 43 100% 67%;
-    --accent-foreground: 210 25% 5%;
-    --destructive: 0 100% 68%;
-    --destructive-foreground: 210 20% 93%;
-    --border: 213 20% 18%;
-    --input: 213 20% 18%;
-    --ring: 187 100% 59%;
-    --radius: 0.625rem;
+    /* ============================================
+       RISK MASASI - DARK THEME (Default)
+       ============================================ */
+
+    /* Background Layers */
+    --bg-primary: #0A0E13;
+    --bg-secondary: #111827;
+    --bg-tertiary: #1F2937;
+    --bg-card: #111827;
+    --bg-hover: #1F2937;
+
+    /* Text Colors */
+    --text-primary: #F9FAFB;
+    --text-secondary: #D1D5DB;
+    --text-muted: #9CA3AF;
     
-    /* Custom Colors */
-    --void-black: #0B0F14;
-    --deep-slate: #121822;
-    --graphite-blue: #1A2230;
-    --signal-cyan: #2FE4FF;
-    --lag-green: #4DFF88;
-    --amber-pulse: #FFC857;
-    --muted-red: #FF5C5C;
-    --soft-white: #E6EDF3;
-    --cool-gray: #9AA4B2;
-    --disabled-gray: #5F6B7A;
-    --grid-lines: #1F2A38;
-    --gold-accent: #FFD700;
-    --crypto-blue: #00D4FF;
+    /* Gold Accent (Core Identity) */
+    --gold-primary: #D4AF37;
+    --gold-soft: #B89B2E;
+    --gold-hover: #E6C75A;
+    --gold-light: rgba(212, 175, 55, 0.15);
     
-    /* Sentilyze Gold Dashboard Colors */
-    --primary-dark: #4E0727;
-    --primary-light: #82C8FC;
-    --text-primary: #1C1E23;
-    --text-secondary: #3A3F4B;
-    --bg-light: #F3F5F8;
-    --bg-warm: #E8DCC4;
-    --accent-gold: #D4AF37;
-    --accent-turquoise: #2FB7C4;
-    --success: #2ECC71;
-    --warning: #F1C40F;
-    --error: #E74C3C;
+    /* Sentiment Colors */
+    --market-up: #2ECC71;
+    --market-up-light: rgba(46, 204, 113, 0.15);
+    --market-down: #E74C3C;
+    --market-down-light: rgba(231, 76, 60, 0.15);
+    --market-neutral: #F1C40F;
+    --market-neutral-light: rgba(241, 196, 15, 0.15);
     
-    /* Gold Dashboard Specific */
-    --gold-primary: #FFD700;
-    --gold-secondary: #D4AF37;
-    --gold-dark: #B8860B;
-    --bullish: #4DFF88;
-    --bearish: #EF4444;
-    --neutral: #6B7280;
+    /* Borders & Dividers */
+    --border-color: #374151;
+    --border-subtle: #2D3748;
     
-    /* Animation Easings */
-    --ease-expo-out: cubic-bezier(0.16, 1, 0.3, 1);
-    --ease-expo-in: cubic-bezier(0.7, 0, 0.84, 0);
-    --ease-elastic: cubic-bezier(0.68, -0.55, 0.265, 1.55);
-    --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
-    --ease-dramatic: cubic-bezier(0.87, 0, 0.13, 1);
-    --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    --ease-liquid: cubic-bezier(0.23, 1, 0.32, 1);
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+    --shadow-gold: 0 0 20px rgba(212, 175, 55, 0.15);
+    
+    /* Shadcn UI Variables */
+    --background: 220 20% 6%;
+    --foreground: 210 15% 92%;
+    --card: 218 18% 11%;
+    --card-foreground: 210 15% 92%;
+    --popover: 218 18% 11%;
+    --popover-foreground: 210 15% 92%;
+    --primary: 45 70% 53%;
+    --primary-foreground: 220 20% 6%;
+    --secondary: 218 15% 15%;
+    --secondary-foreground: 210 15% 92%;
+    --muted: 218 15% 15%;
+    --muted-foreground: 215 15% 55%;
+    --accent: 45 70% 53%;
+    --accent-foreground: 220 20% 6%;
+    --destructive: 6 78% 57%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 218 20% 21%;
+    --input: 218 20% 21%;
+    --ring: 45 70% 53%;
+    --radius: 0.75rem;
   }
 
   .light {
-    --background: 0 0% 98%;
-    --foreground: 213 30% 10%;
+    /* ============================================
+       ANALIST MASASI - LIGHT THEME
+       ============================================ */
+
+    /* Background Layers */
+    --bg-primary: #F9FAFB;
+    --bg-secondary: #FFFFFF;
+    --bg-tertiary: #F3F4F6;
+    --bg-card: #FFFFFF;
+    --bg-hover: #F3F4F6;
+
+    /* Text Colors */
+    --text-primary: #111827;
+    --text-secondary: #374151;
+    --text-muted: #6B7280;
+    
+    /* Gold Accent */
+    --gold-primary: #B8961E;
+    --gold-soft: #D4AF37;
+    --gold-hover: #A68419;
+    --gold-light: rgba(184, 150, 30, 0.15);
+    
+    /* Sentiment Colors (Daha soft) */
+    --market-up: #059669;
+    --market-up-light: rgba(5, 150, 105, 0.15);
+    --market-down: #DC2626;
+    --market-down-light: rgba(220, 38, 38, 0.15);
+    --market-neutral: #D97706;
+    --market-neutral-light: rgba(217, 119, 6, 0.15);
+    
+    /* Borders & Dividers */
+    --border-color: #E5E7EB;
+    --border-subtle: #F3F4F6;
+    
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    --shadow-gold: 0 0 20px rgba(201, 162, 39, 0.12);
+    
+    /* Shadcn UI Variables */
+    --background: 220 20% 98%;
+    --foreground: 220 15% 15%;
     --card: 0 0% 100%;
-    --card-foreground: 213 30% 10%;
+    --card-foreground: 220 15% 15%;
     --popover: 0 0% 100%;
-    --popover-foreground: 213 30% 10%;
-    --primary: 187 100% 45%;
+    --popover-foreground: 220 15% 15%;
+    --primary: 43 70% 47%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 150 100% 45%;
-    --secondary-foreground: 213 30% 10%;
-    --muted: 213 15% 92%;
-    --muted-foreground: 213 15% 40%;
-    --accent: 43 100% 50%;
-    --accent-foreground: 213 30% 10%;
-    --destructive: 0 84% 60%;
+    --secondary: 220 15% 96%;
+    --secondary-foreground: 220 15% 15%;
+    --muted: 220 15% 96%;
+    --muted-foreground: 220 10% 45%;
+    --accent: 43 70% 47%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 6 60% 50%;
     --destructive-foreground: 0 0% 100%;
-    --border: 213 15% 85%;
-    --input: 213 15% 85%;
-    --ring: 187 100% 45%;
+    --border: 220 15% 88%;
+    --input: 220 15% 88%;
+    --ring: 43 70% 47%;
   }
 }
 
@@ -102,275 +138,237 @@
     @apply border-border;
   }
   
+  body {
+    @apply bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+  
   html {
     scroll-behavior: smooth;
-  }
-  
-  body {
-    @apply bg-[var(--void-black)] text-[var(--soft-white)] antialiased;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  }
-  
-  code, pre, .mono {
-    font-family: 'JetBrains Mono', monospace;
   }
 }
 
 @layer components {
-  /* Glassmorphism Card */
-  .glass-card {
-    background-color: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(24px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 1rem;
+  /* Risk/Analist Card - Glass Effect */
+  .risk-card {
+    @apply rounded-xl border transition-all duration-300;
+    background: var(--bg-card);
+    border-color: var(--border-color);
+    box-shadow: var(--shadow-md);
   }
   
-  .glass-card:hover {
-    border-color: rgba(251, 191, 36, 0.4);
-    box-shadow: 0 0 40px rgba(251, 191, 36, 0.15);
-    background-color: rgba(0, 0, 0, 0.5);
+  .risk-card:hover {
+    box-shadow: var(--shadow-lg);
+    border-color: var(--border-subtle);
   }
   
-  /* Gradient Text */
-  .gradient-text {
-    background: linear-gradient(to right, var(--amber-pulse), var(--gold-accent), var(--amber-pulse));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    background-size: 200% auto;
-    animation: gradient-shift 8s linear infinite;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+  .light .risk-card {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   }
   
-  /* Gold Gradient Text */
-  .gold-gradient-text {
-    background: linear-gradient(to right, var(--gold-accent), var(--amber-pulse), var(--gold-accent));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    background-size: 200% auto;
-    animation: gradient-shift 6s linear infinite;
+  /* Gold Accent Button */
+  .btn-gold {
+    @apply px-4 py-2 rounded-lg font-semibold transition-all duration-200;
+    background: var(--gold-primary);
+    color: var(--bg-primary);
+    box-shadow: 0 4px 14px rgba(212, 175, 55, 0.25);
   }
   
-  /* Amber Glow Button */
-  .btn-glow {
-    position: relative;
-    overflow: hidden;
-    background: linear-gradient(135deg, var(--amber-pulse), var(--gold-accent));
-    transition: all 0.3s var(--ease-spring);
-    box-shadow: 0 4px 20px rgba(251, 191, 36, 0.3);
+  .btn-gold:hover {
+    background: var(--gold-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(212, 175, 55, 0.35);
   }
   
-  .btn-glow:hover {
-    transform: translateY(-3px) scale(1.02);
-    box-shadow: 0 0 40px rgba(251, 191, 36, 0.5),
-                0 0 80px rgba(251, 191, 36, 0.3);
+  .light .btn-gold {
+    box-shadow: 0 4px 14px rgba(201, 162, 39, 0.2);
   }
   
-  /* Outline Button */
-  .btn-outline {
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    color: var(--soft-white);
-    background: rgba(0, 0, 0, 0.2);
-    backdrop-filter: blur(10px);
-    transition: all 0.3s var(--ease-smooth);
+  /* Market Prices */
+  .price-bullish {
+    color: var(--market-up);
   }
   
-  .btn-outline:hover {
-    border-color: var(--amber-pulse);
-    background: rgba(251, 191, 36, 0.15);
+  .price-bearish {
+    color: var(--market-down);
   }
   
-  /* Section Container */
-  .section-container {
-    width: 100%;
-    padding-left: 1rem;
-    padding-right: 1rem;
+  .price-neutral {
+    color: var(--market-neutral);
   }
   
-  @media (min-width: 640px) {
-    .section-container {
-      padding-left: 1.5rem;
-      padding-right: 1.5rem;
-    }
-  }
-  
-  @media (min-width: 1024px) {
-    .section-container {
-      padding-left: 2rem;
-      padding-right: 2rem;
-    }
-  }
-  
-  @media (min-width: 1280px) {
-    .section-container {
-      padding-left: 3rem;
-      padding-right: 3rem;
-    }
-  }
-  
-  /* Animated Border */
-  .animated-border {
-    position: relative;
-  }
-  
-  .animated-border::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    padding: 1px;
-    background: linear-gradient(135deg, var(--amber-pulse), var(--gold-accent), var(--amber-pulse), var(--gold-accent));
-    background-size: 300% 300%;
-    animation: border-gradient 8s ease infinite;
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-  }
-  
-  /* Port Badge */
-  .port-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.125rem 0.5rem;
-    border-radius: 0.25rem;
-    font-size: 0.75rem;
-    font-family: 'JetBrains Mono', monospace;
-    background: rgba(251, 191, 36, 0.15);
-    color: var(--amber-pulse);
-    border: 1px solid rgba(251, 191, 36, 0.3);
-  }
-  
-  /* Status Indicator */
-  .status-active {
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: 9999px;
-    background: var(--lag-green);
-    box-shadow: 0 0 8px var(--lag-green);
-    animation: pulse-glow 2s ease-in-out infinite;
-  }
-  
-  /* Floating Animation */
-  .float-slow {
-    animation: float 18s ease-in-out infinite;
-  }
-  
-  .float-medium {
-    animation: float 15s ease-in-out infinite;
-  }
-  
-  .float-fast {
-    animation: float 12s ease-in-out infinite;
-  }
-  
-  /* Glow Effects */
-  .glow-cyan {
-    box-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
+  /* Sentiment Badges */
+  .badge-bullish {
+    @apply px-2.5 py-1 rounded-full text-xs font-bold;
+    background: var(--market-up-light);
+    color: var(--market-up);
+    border: 1px solid rgba(46, 204, 113, 0.35);
   }
 
-  .glow-green {
-    box-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
+  .badge-bearish {
+    @apply px-2.5 py-1 rounded-full text-xs font-bold;
+    background: var(--market-down-light);
+    color: var(--market-down);
+    border: 1px solid rgba(231, 76, 60, 0.35);
   }
 
-  .glow-gold {
-    box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+  .badge-neutral {
+    @apply px-2.5 py-1 rounded-full text-xs font-bold;
+    background: var(--market-neutral-light);
+    color: var(--market-neutral);
+    border: 1px solid rgba(241, 196, 15, 0.35);
   }
-}
 
-@layer utilities {
-  /* Custom Animations */
-  @keyframes gradient-shift {
-    0% { background-position: 0% center; }
-    100% { background-position: 200% center; }
+  .light .badge-bullish {
+    background: rgba(5, 150, 105, 0.1);
+    color: #047857;
+    border-color: rgba(5, 150, 105, 0.3);
+  }
+
+  .light .badge-bearish {
+    background: rgba(220, 38, 38, 0.1);
+    color: #B91C1C;
+    border-color: rgba(220, 38, 38, 0.3);
+  }
+
+  .light .badge-neutral {
+    background: rgba(217, 119, 6, 0.1);
+    color: #C2410C;
+    border-color: rgba(217, 119, 6, 0.3);
   }
   
-  @keyframes border-gradient {
-    0%, 100% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
+  /* Gold Highlight */
+  .gold-highlight {
+    color: var(--gold-primary);
   }
   
-  @keyframes float {
-    0%, 100% { transform: translateY(0) translateX(0); }
-    25% { transform: translateY(-15px) translateX(8px); }
-    50% { transform: translateY(-8px) translateX(-5px); }
-    75% { transform: translateY(-20px) translateX(3px); }
+  .gold-bg {
+    background: var(--gold-light);
   }
   
-  @keyframes pulse-glow {
-    0%, 100% { opacity: 1; box-shadow: 0 0 8px currentColor; }
-    50% { opacity: 0.6; box-shadow: 0 0 16px currentColor; }
+  .gold-border {
+    border-color: var(--gold-primary);
   }
   
-  @keyframes slide-down {
-    from { transform: translateY(-100%); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+  /* Data Table - Risk/Analist Style */
+  .data-table {
+    @apply w-full;
   }
   
-  @keyframes fade-in-up {
-    from { transform: translateY(30px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+  .data-table th {
+    @apply py-3 px-4 text-left text-xs font-bold uppercase tracking-wider;
+    color: var(--text-secondary);
+    border-bottom: 2px solid var(--border-color);
+    background: var(--bg-tertiary);
+  }
+
+  .data-table td {
+    @apply py-3 px-4;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-primary);
   }
   
-  @keyframes scale-in {
-    from { transform: scale(0.9); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
+  .data-table tr:hover {
+    background: var(--bg-hover);
   }
   
-  @keyframes draw-line {
-    from { stroke-dashoffset: 100%; }
-    to { stroke-dashoffset: 0%; }
+  /* Navigation */
+  .nav-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200;
+    color: var(--text-secondary);
   }
   
-  @keyframes data-flow {
-    0% { offset-distance: 0%; opacity: 0; }
-    10% { opacity: 1; }
-    90% { opacity: 1; }
-    100% { offset-distance: 100%; opacity: 0; }
+  .nav-item:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
   }
   
-  /* Animation Delays */
-  .delay-100 { animation-delay: 100ms; }
-  .delay-200 { animation-delay: 200ms; }
-  .delay-300 { animation-delay: 300ms; }
-  .delay-400 { animation-delay: 400ms; }
-  .delay-500 { animation-delay: 500ms; }
-  .delay-600 { animation-delay: 600ms; }
-  .delay-700 { animation-delay: 700ms; }
-  .delay-800 { animation-delay: 800ms; }
+  .nav-item.active {
+    background: var(--gold-light);
+    color: var(--gold-primary);
+    border: 1px solid var(--gold-primary);
+  }
   
-  /* Scrollbar Styling */
+  /* Chart Container */
+  .chart-panel {
+    @apply rounded-xl p-4;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+  }
+  
+  /* KPI Cards */
+  .kpi-card {
+    @apply p-4 rounded-xl;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+  }
+  
+  .kpi-value {
+    @apply text-2xl font-bold;
+    color: var(--text-primary);
+  }
+  
+  .kpi-label {
+    @apply text-xs uppercase tracking-wide;
+    color: var(--text-muted);
+  }
+  
+  /* Scrollbar */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
   
   ::-webkit-scrollbar-track {
-    background: var(--void-black);
+    background: var(--bg-secondary);
   }
   
   ::-webkit-scrollbar-thumb {
-    background: var(--graphite-blue);
-    border-radius: 4px;
+    background: var(--border-color);
+    border-radius: 3px;
   }
   
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--amber-pulse);
+    background: var(--text-muted);
   }
   
   /* Selection */
   ::selection {
-    background: rgba(251, 191, 36, 0.3);
-    color: var(--soft-white);
+    background: var(--gold-light);
+    color: var(--text-primary);
   }
 }
 
-/* Reduced Motion */
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+@layer utilities {
+  .bg-risk-primary {
+    background-color: var(--bg-primary);
+  }
+  
+  .bg-risk-secondary {
+    background-color: var(--bg-secondary);
+  }
+  
+  .bg-risk-card {
+    background-color: var(--bg-card);
+  }
+  
+  .text-risk-primary {
+    color: var(--text-primary);
+  }
+  
+  .text-risk-secondary {
+    color: var(--text-secondary);
+  }
+  
+  .text-risk-muted {
+    color: var(--text-muted);
+  }
+  
+  .border-risk {
+    border-color: var(--border-color);
+  }
+  
+  .shadow-risk {
+    box-shadow: var(--shadow-md);
   }
 }
