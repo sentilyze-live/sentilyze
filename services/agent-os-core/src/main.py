@@ -93,10 +93,8 @@ async def lifespan(app: FastAPI):
     app.state.firestore = FirestoreDataClient()
     app.state.pubsub = PubSubDataClient()
     
-    # Initialize shared httpx client for Kimi
-    from src.api.kimi_client import KimiClient
-    await KimiClient.get_shared_client()
-    logger.info("agent_os.shared_client_initialized")
+    # KimiClient instances are created per-agent on demand
+    logger.info("agent_os.api_clients_ready")
     
     # Create Pub/Sub topics
     try:
