@@ -14,14 +14,19 @@ const PredictionTable: React.FC = () => {
       try {
         setIsLoading(true);
         setError(null);
-        
+
         const [scenariosData, reportData] = await Promise.all([
           getPredictionScenarios(),
           getDailyAnalysisReport()
         ]);
-        
+
         if (scenariosData && scenariosData.length > 0) {
-          setScenarios(scenariosData);
+          // Filter to only show desired timeframes: 30dk, 1 saat, 3 saat, 6 saat
+          const desiredTimeframes = ['30 Dakika', '1 Saat', '3 Saat', '6 Saat'];
+          const filteredScenarios = scenariosData.filter(s =>
+            desiredTimeframes.some(tf => s.timeframe.includes(tf))
+          );
+          setScenarios(filteredScenarios.length > 0 ? filteredScenarios : scenariosData);
         }
         if (reportData) {
           setDailyReport(reportData);
@@ -35,7 +40,7 @@ const PredictionTable: React.FC = () => {
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 300000); // Her 5 dakikada bir güncelle
+    const interval = setInterval(fetchData, 120000); // Her 2 dakikada bir güncelle (optimize edildi)
     return () => clearInterval(interval);
   }, []);
 
@@ -106,10 +111,10 @@ const PredictionTable: React.FC = () => {
         <div>
           <h2 className="text-xl font-bold text-blue-400 flex items-center gap-2">
             <BarChart3 className="w-6 h-6" />
-            SENARYO ANALİZLERİ
+            FİYAT TAHMİN SENARYOLARl
           </h2>
           <p className="text-xs text-[#5F6B7A] mt-1">
-            Yapay zeka modelleri tarafından oluşturulan hipotetik senaryolar
+            30 dakika, 1 saat, 3 saat ve 6 saat sonraki fiyat tahminleri (LSTM + ARIMA + XGBoost modelleri)
           </p>
         </div>
         

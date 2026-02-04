@@ -18,7 +18,6 @@ import GoldChart from './components/gold/GoldChart';
 import TechnicalIndicators from './components/gold/TechnicalIndicators';
 import SentimentPanel from './components/gold/SentimentPanel';
 import NewsFeed from './components/gold/NewsFeed';
-import SpikeAnalysis from './components/gold/SpikeAnalysis';
 import './App.css';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -49,7 +48,6 @@ const GoldDashboard: React.FC = () => {
             <SentimentPanel />
             <NewsFeed />
           </div>
-          <SpikeAnalysis />
         </main>
       </div>
     </DashboardLayout>
