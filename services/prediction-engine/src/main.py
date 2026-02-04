@@ -250,7 +250,8 @@ async def generate_batch_predictions(request: BatchPredictionRequest):
         )
 
     try:
-        prediction_types = ["30m", "1h", "3h", "6h"]
+        # Optimized timeframes based on sentiment-to-price lag analysis
+        prediction_types = ["1h", "2h", "3h"]
         predictions = []
         
         for pred_type in prediction_types:

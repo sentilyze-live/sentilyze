@@ -247,13 +247,12 @@ class PredictionEngine:
             ml_prediction * weights["ml"]
         )
         
-        # Time multiplier
+        # Time multiplier - Optimized for sentiment-to-price lag
         time_multipliers = {
-            "30m": 0.5,
-            "1h": 1.0,
-            "3h": 1.5,
-            "6h": 2.0,
-            "1d": 4.0,
+            "1h": 1.0,    # Baseline - most balanced
+            "2h": 1.3,    # Optimal trend capture
+            "3h": 1.5,    # Long-term reliable
+            "4h": 2.0,    # Optional extended timeframe
         }
         multiplier = time_multipliers.get(prediction_type, 1.0)
         
@@ -329,8 +328,13 @@ class PredictionEngine:
         # Sentiment strength
         confidence += min(15, abs(sentiment_score) * 30)
         
-        # Time penalty
-        time_penalties = {"30m": 0, "1h": -5, "3h": -10, "6h": -15, "1d": -20}
+        # Time penalty - Optimized confidence scoring
+        time_penalties = {
+            "1h": 0,      # Most reliable
+            "2h": -3,     # Minimal penalty
+            "3h": -8,     # Moderate penalty
+            "4h": -12,    # Higher uncertainty
+        }
         confidence += time_penalties.get(prediction_type, 0)
         
         return max(settings.min_confidence_score, min(settings.max_confidence_score, confidence))
