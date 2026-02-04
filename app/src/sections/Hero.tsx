@@ -62,12 +62,12 @@ const Hero = () => {
           loop
           muted
           playsInline
-          className="w-full h-full object-cover opacity-30"
+          className="w-full h-full object-cover opacity-80"
         >
           <source src="/aurora-background.mp4" type="video/mp4" />
         </video>
-        {/* Dark Overlay with Aurora accent */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0A0E13]/95 via-[#0A0E13]/85 to-[#0A0E13]/95" />
+        {/* Dark Overlay with Aurora accent - Reduced for brighter video */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0A0E13]/60 via-[#0A0E13]/50 to-[#0A0E13]/70" />
         {/* Aurora glow effect */}
         <div className="absolute inset-0 bg-gradient-radial from-[var(--aurora-primary)]/5 via-transparent to-transparent" />
       </div>

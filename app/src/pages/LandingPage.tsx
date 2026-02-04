@@ -139,30 +139,30 @@ const LandingPage: React.FC = () => {
             En gelişmiş yapay zeka teknolojileri ile piyasaları analiz edin, doğru zamanda doğru kararları verin.
           </p>
           <div className="grid md:grid-cols-3 gap-8">
-            <div className="bg-black/40 rounded-2xl p-8 border border-white/10 hover:border-blue-500/50 transition-all backdrop-blur-xl hover:bg-black/50">
-              <div className="w-14 h-14 rounded-xl bg-blue-500/20 flex items-center justify-center mb-6">
+            <div className="bg-black/70 rounded-2xl p-8 border border-white/30 hover:border-blue-500/70 transition-all backdrop-blur-xl hover:bg-black/80 shadow-xl">
+              <div className="w-14 h-14 rounded-xl bg-blue-500/30 flex items-center justify-center mb-6 shadow-lg">
                 <BarChart3 className="w-7 h-7 text-blue-400" />
               </div>
               <h3 className="text-xl font-bold text-white mb-3 drop-shadow-md">AI Tahminleri</h3>
-              <p className="text-gray-300">
+              <p className="text-gray-200">
                 LSTM, ARIMA ve XGBoost modelleri ile altın ve kripto para fiyat tahminleri. Dakikalar içinde güncellenen veriler.
               </p>
             </div>
-            <div className="bg-black/40 rounded-2xl p-8 border border-white/10 hover:border-blue-500/50 transition-all backdrop-blur-xl hover:bg-black/50">
-              <div className="w-14 h-14 rounded-xl bg-blue-500/20 flex items-center justify-center mb-6">
+            <div className="bg-black/70 rounded-2xl p-8 border border-white/30 hover:border-blue-500/70 transition-all backdrop-blur-xl hover:bg-black/80 shadow-xl">
+              <div className="w-14 h-14 rounded-xl bg-blue-500/30 flex items-center justify-center mb-6 shadow-lg">
                 <TrendingUp className="w-7 h-7 text-blue-400" />
               </div>
               <h3 className="text-xl font-bold text-white mb-3 drop-shadow-md">Teknik Analiz</h3>
-              <p className="text-gray-300">
+              <p className="text-gray-200">
                 RSI, MACD, Bollinger Bands ve daha fazlası. Profesyonel teknik analiz araçları ile piyasayı okuyun.
               </p>
             </div>
-            <div className="bg-black/40 rounded-2xl p-8 border border-white/10 hover:border-blue-500/50 transition-all backdrop-blur-xl hover:bg-black/50">
-              <div className="w-14 h-14 rounded-xl bg-blue-500/20 flex items-center justify-center mb-6">
+            <div className="bg-black/70 rounded-2xl p-8 border border-white/30 hover:border-blue-500/70 transition-all backdrop-blur-xl hover:bg-black/80 shadow-xl">
+              <div className="w-14 h-14 rounded-xl bg-blue-500/30 flex items-center justify-center mb-6 shadow-lg">
                 <Bell className="w-7 h-7 text-blue-400" />
               </div>
               <h3 className="text-xl font-bold text-white mb-3 drop-shadow-md">Akıllı Alarmlar</h3>
-              <p className="text-gray-300">
+              <p className="text-gray-200">
                 Belirlediğiniz fiyat seviyelerine ulaşıldığında anında Telegram bildirimi alın. Hiçbir fırsatı kaçırmayın.
               </p>
             </div>
