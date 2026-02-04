@@ -151,6 +151,9 @@ class Settings(BaseSettings):
     MONTHLY_AI_COST_LIMIT_USD: float = 1000.0  # Alert if monthly cost exceeds $1000
     COST_ALERT_EMAIL: str = "admin@sentilyze.live"
 
+    # Domain (Cloud Run service URL for webhook)
+    DOMAIN: str = ""
+
     # Telegram
     TELEGRAM_BOT_TOKEN: str = Field(default="", description="Telegram Bot Token")
     TELEGRAM_CHAT_ID: str = Field(default="", description="Telegram Chat ID")
@@ -166,6 +169,10 @@ class Settings(BaseSettings):
     ENABLE_SENTINEL: bool = True
     ENABLE_ATLAS: bool = True
     ENABLE_MARIA: bool = True
+
+    # MARIA Agent Settings
+    MARIA_INTERVAL_MIN: int = 30  # Minutes between checks (minimum)
+    MARIA_INTERVAL_MAX: int = 60  # Minutes between checks (maximum)
 
     # CODER Agent Settings
     CODER_PROJECT_ROOT: str = "/app"
