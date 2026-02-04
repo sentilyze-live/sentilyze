@@ -21,8 +21,8 @@ const PredictionTable: React.FC = () => {
         ]);
 
         if (scenariosData && scenariosData.length > 0) {
-          // Filter to only show desired timeframes: 30dk, 1 saat, 3 saat, 6 saat
-          const desiredTimeframes = ['30 Dakika', '1 Saat', '3 Saat', '6 Saat'];
+          // Filter to only show optimized timeframes: 1 saat, 2 saat, 3 saat
+          const desiredTimeframes = ['1 Saat', '2 Saat', '3 Saat'];
           const filteredScenarios = scenariosData.filter(s =>
             desiredTimeframes.some(tf => s.timeframe.includes(tf))
           );
