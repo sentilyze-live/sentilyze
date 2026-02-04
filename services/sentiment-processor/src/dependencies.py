@@ -56,7 +56,7 @@ def get_firestore_client() -> firestore.Client:
     """Get or create Firestore client singleton."""
     global _firestore_client
     if _firestore_client is None:
-        project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "sentilyze-v5-clean")
+        project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "sentilyze-v6-clean")
         _firestore_client = firestore.Client(project=project_id)
     return _firestore_client
 
@@ -84,7 +84,7 @@ async def get_semantic_cache() -> AsyncGenerator[FirebaseSemanticCache, None]:
                 "Install with: `poetry install --with ml`"
             ) from e
 
-        project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "sentilyze-v5-clean")
+        project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "sentilyze-v6-clean")
         storage_bucket = os.getenv("CACHE_STORAGE_BUCKET", f"{project_id}-cache")
         
         _semantic_cache = FirebaseSemanticCache(
@@ -304,7 +304,7 @@ def create_ml_integration(
     graph = None
     
     if enable_cache:
-        project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "sentilyze-v5-clean")
+        project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "sentilyze-v6-clean")
         storage_bucket = os.getenv("CACHE_STORAGE_BUCKET", f"{project_id}-cache")
         
         cache = FirebaseSemanticCache(

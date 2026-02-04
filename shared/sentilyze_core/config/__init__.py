@@ -118,6 +118,13 @@ class Settings(BaseSettings):
     metals_api_key: Optional[str] = Field(default=None, alias="METALS_API_KEY")
     twelve_data_api_key: Optional[str] = Field(default=None, alias="TWELVE_DATA_API_KEY")
     eodhd_api_key: Optional[str] = Field(default=None, alias="EODHD_API_KEY")
+
+    # Turkish Data Sources
+    tcmb_evds_api_key: Optional[str] = Field(
+        default=None,
+        alias="TCMB_EVDS_API_KEY",
+        description="TCMB EVDS (Central Bank Electronic Data System) API key",
+    )
     
     ingestion_admin_api_key: Optional[str] = Field(
         default=None,

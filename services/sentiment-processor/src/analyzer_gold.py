@@ -93,11 +93,15 @@ MACRO_PATTERNS = {
     MacroIndicatorType.GEOPOLITICAL: ["war", "conflict", "sanctions", "geopolitical", "election", "brexit", "tension"],
 }
 
-# Gold keywords for content filtering
+# Gold keywords for content filtering (English + Turkish)
 GOLD_KEYWORDS = [
+    # English
     "gold", "xau", "xauusd", "precious metal", "bullion",
     "gld", "iau", "gdx", "gold price", "gold market",
     "gold etf", "gold futures", "spot gold",
+    # Turkish
+    "altın", "gram altın", "çeyrek altın", "ons", "xautry",
+    "külçe", "kuyumcu", "altın fiyatı",
 ]
 
 # Driver to indicator mapping
@@ -247,9 +251,13 @@ class GoldSentimentAnalyzer(BaseSentimentAnalyzer):
         super().__init__(prompt_template)
         self._market_type = "gold"
         self._cot_report: CotReport | None = None
+        self._language: str = "en"  # Default to English
 
     @property
     def _prompt_file_name(self) -> str:
+        # Return Turkish prompt if Turkish content detected
+        if self._language == "tr":
+            return "turkish_gold_v1.txt"
         return "gold_v1.txt"
 
     @property
@@ -264,6 +272,25 @@ class GoldSentimentAnalyzer(BaseSentimentAnalyzer):
         self._cot_report = cot_report
         logger.info(f"COT report set for date: {cot_report.report_date if cot_report else 'None'}")
 
+    def _detect_language(self, text: str) -> str:
+        """Detect if text is Turkish or English.
+
+        Args:
+            text: Text to analyze
+
+        Returns:
+            "tr" for Turkish, "en" for English
+        """
+        try:
+            from sentilyze_core.keywords_turkish import is_turkish_gold_content
+
+            if is_turkish_gold_content(text):
+                return "tr"
+            return "en"
+        except ImportError:
+            logger.warning("Turkish keywords module not found, defaulting to English")
+            return "en"
+
     def _is_content_relevant(self, content: str | None) -> bool:
         """Check if content is gold-related."""
         if not content:
@@ -273,15 +300,23 @@ class GoldSentimentAnalyzer(BaseSentimentAnalyzer):
         return any(keyword in content_lower for keyword in GOLD_KEYWORDS)
 
     def _build_prompt(self, text: str) -> str:
-        """Build prompt with optional COT context."""
+        """Build prompt with optional COT context and language detection."""
         prompt_text = text[:3000]
-        
-        # Add COT context if available and enabled
-        if self._cot_report and settings.enable_cot_framework:
+
+        # Detect language and reload prompt if needed
+        detected_language = self._detect_language(prompt_text)
+        if detected_language != self._language:
+            self._language = detected_language
+            # Reload prompt template for detected language
+            self._load_prompt_template()
+            logger.info(f"Detected language: {detected_language}, loaded appropriate prompt")
+
+        # Add COT context if available and enabled (only for English)
+        if self._cot_report and settings.enable_cot_framework and self._language == "en":
             cot_context = self._build_cot_context()
             if cot_context:
                 prompt_text = f"{cot_context}\n\n{prompt_text}"
-        
+
         return self._prompt_template.format(text=prompt_text)
 
     def _build_cot_context(self) -> str:

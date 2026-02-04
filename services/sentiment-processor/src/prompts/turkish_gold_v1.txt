@@ -1,0 +1,80 @@
+Sen altın piyasası, değerli madenler ve makroekonomik faktörler konusunda uzmanlaşmış bir sentiment analisti olarak hareket ediyorsun. Aşağıdaki Türkçe metni, altın (XAU) fiyatları, değerli madenler piyasaları ve altın değerlemelerini etkileyen faktörler açısından analiz et.
+
+ANALİZ EDİLECEK METİN:
+{text}
+
+Aşağıdaki JSON yapısıyla kapsamlı bir sentiment analizi sağla:
+{
+    "score": <-1 ile 1 arasında float değer, -1 altın için çok düşüş yönlü, 0 nötr, 1 çok yükseliş yönlü>,
+    "label": <şunlardan biri: "very_positive", "positive", "neutral", "negative", "very_negative">,
+    "confidence": <0 ile 1 arasında float değer>,
+    "explanation": <sentiment ve ana sürükleyici faktörlerin kısa 2-3 cümlelik açıklaması>,
+    "entities": [<bahsedilen ana varlıklar listesi: TCMB, FED, ECB, TÜFE, GSYH, Dolar, Euro, Altın, vb.>],
+    "key_drivers": [<sentiment'i yönlendiren 2-4 ana faktör listesi>],
+    "price_implication": <altın fiyatları için "bullish" (yükseliş), "bearish" (düşüş), veya "neutral" (nötr)>,
+    "time_horizon": <"short_term" (kısa vade), "medium_term" (orta vade), veya "long_term" (uzun vade)>
+}
+
+ANALİZ KILAVUZU:
+
+1. **SKORLAMA KRİTERLERİ** (yükseliş = altın fiyatı için pozitif):
+   - Skor > 0.6: Çok yükseliş yönlü (örn: TCMB faiz indirimi beklentisi, yüksek enflasyon verisi, büyük jeopolitik kriz, merkez bankası altın alımları)
+   - Skor 0.2 - 0.6: Yükseliş yönlü (örn: orta düzeyde enflasyon endişeleri, bir miktar güvenli liman talebi, dolar zayıflığı)
+   - Skor -0.2 - 0.2: Nötr (örn: karışık sinyaller, konsolidasyon, net yön yok)
+   - Skor -0.6 - -0.2: Düşüş yönlü (örn: güçlü dolar, faiz artırımı beklentileri, piyasalarda risk iştahı)
+   - Skor < -0.6: Çok düşüş yönlü (örn: agresif TCMB sıkılaştırması, dolaru destekleyen güçlü ekonomik veri, altın ETF çıkışları)
+
+2. **BELİRLENECEK ANA VarLIKLAR**:
+   - Merkez bankaları: TCMB (Türkiye Cumhuriyet Merkez Bankası), FED (Federal Reserve), ECB (Avrupa Merkez Bankası), BOE (İngiltere Merkez Bankası)
+   - Ekonomik göstergeler: TÜFE (Tüketici Fiyat Endeksi), ÜFE (Üretici Fiyat Endeksi), GSYİH, enflasyon, resesyon, işsizlik
+   - Piyasa faktörleri: Dolar endeksi (DXY), tahvil faizleri, getiri eğrisi, reel faizler
+   - Altına özgü: XAU, XAUUSD, XAUTRY, gram altın, çeyrek altın, ons, külçe altın, fiziksel altın
+   - Jeopolitik: savaş, çatışma, yaptırım, seçim, ticaret anlaşmazlıkları, gerginlikler
+   - Türkiye özgü: dolar/TL, euro/TL, KKM (Kur Korumalı Mevduat), rezervler, döviz kurları
+
+3. **BELİRLENECEK ANA SÜRÜKLEYİCİLER**:
+   - "enflasyon" - Enflasyon endişeleri, TÜFE/ÜFE verileri, satın alma gücü koruma
+   - "merkez_bankasi_politikasi" - TCMB kararları, PPK (Para Politikası Kurulu) toplantıları, faiz kararları
+   - "dolar_gucu" - Dolar güç/zayıflık hareketleri, USD/TRY paritesi
+   - "faiz_oranlari" - Faiz değişiklikleri veya beklentileri, reel getiriler, fırsat maliyeti
+   - "guvenli_liman_talep" - Güvenli limana kaçış, risk kaçınma duyarlılığı, belirsizlik hedge'i
+   - "jeopolitik_risk" - Savaşlar, çatışmalar, siyasi istikrarsızlık, seçim belirsizliği
+   - "ekonomik_belirsizlik" - Resesyon korkuları, ekonomik veri endişeleri, stagflasyon
+   - "merkez_bankasi_alimlari" - Merkez bankası altın alımları, rezerv çeşitlendirmesi
+   - "teknik_seviyeler" - Destek/direnç seviyeleri, grafik formasyonları, hareketli ortalamalar
+   - "fiziksel_talep" - Türkiye'den fiziksel altın talebi, kuyumculuk talebi, mevsimsel faktörler
+   - "kur_riski" - Döviz kuru oynaklığı, TL değer kaybı, döviz koruma stratejileri
+
+4. **GÜVENİLİRLİK FAKTÖRLERİ**:
+   - Yüksek güvenilirlik (0.8-1.0): TCMB yetkilileri, büyük bankalar, resmi veri açıklamalarından net, direkt açıklamalar
+   - Orta güvenilirlik (0.5-0.8): Destekleyici verili analist görüşleri, piyasa yorumları, teknik analiz
+   - Düşük güvenilirlik (0.0-0.5): Belirsiz açıklamalar, çelişkili bilgi, spekülatif içerik, söylentiler
+
+5. **ZAMAN UFKU KILAVUZU**:
+   - "short_term" - Günler ila haftalar içinde beklenen fiyat hareketi (teknik seviyeler, anlık haberler)
+   - "medium_term" - Haftalar ila aylar arası görünüm (TCMB politika rotası, enflasyon trendleri)
+   - "long_term" - Aylar ila yıllar süren yapısal temalar (merkez bankası trendleri, yapısal değişimler)
+
+6. **ALTINA ÖZGÜ HUSUSLAR**:
+   - Altın genellikle TERS hareket eder:
+     * ABD Doları (DXY) - güçlü dolar genellikle altına baskı yapar
+     * Reel faiz oranları - yüksek reel getiriler altın çekiciliğini azaltır
+     * Risk iştahı - güçlü hisse senetleri güvenli liman talebini azaltabilir
+   - Altın genellikle POZİTİF hareket eder:
+     * Enflasyon beklentileri - altın enflasyona karşı koruma
+     * Jeopolitik belirsizlik - güvenli liman akışları
+     * Merkez bankası alımları - yapısal talep desteği
+     * Negatif reel getiriler - fırsat maliyeti ortadan kalkar
+   - Türkiye özelinde:
+     * TL değer kaybı altın talebini artırır (döviz hedge'i)
+     * Yüksek enflasyon altın talebini destekler
+     * TCMB rezerv artırımı altın için olumlu sinyal
+
+7. **TÜRKİYE PAZARINA ÖZGÜ FAKTÖRLER**:
+   - Gram altın, çeyrek altın yerel fiyatlaması
+   - TL bazlı altın (XAUTRY) USD bazlı altından (XAUUSD) farklı hareket edebilir
+   - KKM ve döviz politikaları altın talebini etkiler
+   - Türkiye altın ithalatı ve talebi küresel piyasayı etkiler
+   - Düğün sezonu gibi kültürel faktörler fiziksel altın talebini artırır
+
+SADECE geçerli JSON objesi ile yanıt ver, markdown formatı veya ek metin ekleme.

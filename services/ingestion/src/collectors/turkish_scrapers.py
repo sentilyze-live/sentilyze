@@ -1,10 +1,13 @@
-"""Turkish gold and currency scrapers collector.
+"""Turkish economic indicators collector.
 
 Uses only reliable API-based sources:
-- Truncgil Finans API (reliable API-based)
-- TCMB (Central Bank announcements)
+- TCMB EVDS (Central Bank official economic indicators - API-based)
+- TCMB Announcements (Central Bank announcements - web scraping fallback)
 
-Note: Harem Altın and Nadir Döviz scrapers removed due to Cloudflare blocking.
+Note:
+- Truncgil removed due to persistent CORS errors
+- Gold prices now sourced from Finnhub (primary) and Gold API (secondary)
+- Harem Altın and Nadir Döviz removed due to Cloudflare blocking
 """
 
 from datetime import datetime, timezone
@@ -30,29 +33,35 @@ class TurkishScrapersCollector(BaseEventCollector):
         self._settings = None
 
     async def initialize(self) -> None:
-        """Initialize Turkish scrapers (Truncgil + TCMB only)."""
+        """Initialize Turkish scrapers (TCMB EVDS + TCMB Announcements)."""
+        from sentilyze_core.config import get_settings
         from .turkish_sources import (
-            TruncgilScraper,
             TCMBScraper,
+            TCMBEVDSCollector,
         )
 
-        # Initialize Truncgil (reliable API)
-        try:
-            truncgil = TruncgilScraper()
-            await truncgil.initialize()
-            self.scrapers["truncgil"] = truncgil
-            logger.info("Truncgil scraper initialized")
-        except Exception as e:
-            logger.error("Failed to initialize Truncgil scraper", error=str(e))
+        settings = get_settings()
 
-        # Initialize TCMB (Central Bank)
+        # Initialize TCMB EVDS (official economic indicators API - PRIORITY)
+        if settings.tcmb_evds_api_key:
+            try:
+                tcmb_evds = TCMBEVDSCollector(api_key=settings.tcmb_evds_api_key)
+                await tcmb_evds.initialize()
+                self.scrapers["tcmb_evds"] = tcmb_evds
+                logger.info("TCMB EVDS collector initialized")
+            except Exception as e:
+                logger.error("Failed to initialize TCMB EVDS collector", error=str(e))
+        else:
+            logger.warning("TCMB EVDS API key not configured, skipping EVDS collector")
+
+        # Initialize TCMB Announcements (fallback web scraper)
         try:
             tcmb = TCMBScraper()
             await tcmb.initialize()
             self.scrapers["tcmb"] = tcmb
-            logger.info("TCMB scraper initialized")
+            logger.info("TCMB announcements scraper initialized")
         except Exception as e:
-            logger.error("Failed to initialize TCMB scraper", error=str(e))
+            logger.error("Failed to initialize TCMB announcements scraper", error=str(e))
 
         if not self.scrapers:
             raise ExternalServiceError(
@@ -100,7 +109,7 @@ class TurkishScrapersCollector(BaseEventCollector):
         """Collect from a specific scraper source.
 
         Args:
-            source: Scraper name (truncgil, tcmb)
+            source: Scraper name (tcmb, tcmb_evds)
 
         Returns:
             List of RawEvent objects
@@ -115,9 +124,9 @@ class TurkishScrapersCollector(BaseEventCollector):
         events: list[RawEvent] = []
 
         try:
-            if source == "truncgil":
-                data = await scraper.scrape_prices()
-                event = self._truncgil_to_event(data)
+            if source == "tcmb_evds":
+                indicators = await scraper.fetch_latest_indicators()
+                event = self._tcmb_evds_to_event(indicators)
                 if event:
                     events.append(event)
 
@@ -141,41 +150,42 @@ class TurkishScrapersCollector(BaseEventCollector):
                 service="turkish_scrapers",
             ) from e
 
-    def _truncgil_to_event(self, data: dict) -> Optional[RawEvent]:
-        """Convert Truncgil data to RawEvent."""
+    def _tcmb_evds_to_event(self, indicators: dict) -> Optional[RawEvent]:
+        """Convert TCMB EVDS indicators to RawEvent."""
         try:
-            altin = data.get("altin_try", {})
-            ons = data.get("ons", {})
-            dolar = data.get("dolar", {})
-            euro = data.get("euro", {})
+            if not indicators:
+                return None
 
-            content = (
-                f"Gram Altın: {altin.get('satis')} TRY, "
-                f"Ons: {ons.get('satis')} USD, "
-                f"Dolar: {dolar.get('satis')} TRY, "
-                f"Euro: {euro.get('satis')} TRY"
-            )
+            # Build content summary
+            content_parts = ["TCMB Economic Indicators:"]
+
+            usd_try = indicators.get("usd_try", {}).get("value")
+            eur_try = indicators.get("eur_try", {}).get("value")
+            cpi = indicators.get("cpi", {}).get("value")
+
+            if usd_try:
+                content_parts.append(f"USD/TRY: {usd_try:.4f}")
+            if eur_try:
+                content_parts.append(f"EUR/TRY: {eur_try:.4f}")
+            if cpi:
+                content_parts.append(f"CPI: {cpi:.2f}")
+
+            content = ", ".join(content_parts)
 
             return RawEvent(
                 source=DataSource.CUSTOM,
-                source_id=f"truncgil_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
+                source_id=f"tcmb_evds_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M')}",
                 content=content,
                 metadata={
-                    "source": "truncgil",
-                    "data_type": "turkish_gold_prices",
-                    "prices": {
-                        "gram_altin": altin,
-                        "ons": ons,
-                        "dolar": dolar,
-                        "euro": euro,
-                    },
-                    "raw_data": data,
+                    "source": "tcmb_evds",
+                    "data_type": "economic_indicators",
+                    "indicators": indicators,
                 },
                 collected_at=datetime.now(timezone.utc),
-                symbols=["XAUTRY", "XAUUSD", "USDTRY", "EURTRY"],
+                symbols=["XAUTRY", "USDTRY", "EURTRY"],
             )
         except Exception as e:
-            logger.error("Failed to convert Truncgil data", error=str(e))
+            logger.error("Failed to convert TCMB EVDS data", error=str(e))
             return None
 
     def _tcmb_announcement_to_event(self, announcement: dict) -> Optional[RawEvent]:

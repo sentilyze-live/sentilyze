@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     PORT: int = 8080
 
     # GCP
-    GCP_PROJECT_ID: str = "sentilyze-v5-clean"
+    GCP_PROJECT_ID: str = "sentilyze-v6-clean"
     GCP_REGION: str = "us-central1"
     GCP_ZONE: str = "us-central1-a"
 
@@ -39,12 +39,12 @@ class Settings(BaseSettings):
     BIGQUERY_EMULATOR_HOST: Optional[str] = None
 
     # Firestore
-    FIRESTORE_PROJECT_ID: str = "sentilyze-v5-clean"
+    FIRESTORE_PROJECT_ID: str = "sentilyze-v6-clean"
     FIRESTORE_EMULATOR_HOST: Optional[str] = None
     CACHE_TYPE: str = "firestore"
 
     # Pub/Sub
-    PUBSUB_PROJECT_ID: str = "sentilyze-v5-clean"
+    PUBSUB_PROJECT_ID: str = "sentilyze-v6-clean"
     PUBSUB_EMULATOR_HOST: Optional[str] = None
 
     # Moonshot API (Kimi 2.5)
