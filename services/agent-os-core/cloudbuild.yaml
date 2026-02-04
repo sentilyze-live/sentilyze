@@ -1,0 +1,55 @@
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/sentilyze-v6-clean/agent-os-core:autonomous-v1'
+      - '-f'
+      - 'services/agent-os-core/Dockerfile.simple'
+      - '.'
+
+  # Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/sentilyze-v6-clean/agent-os-core:autonomous-v1'
+
+  # Deploy container image to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'agent-os-core'
+      - '--image'
+      - 'gcr.io/sentilyze-v6-clean/agent-os-core:autonomous-v1'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--memory'
+      - '1Gi'
+      - '--cpu'
+      - '1'
+      - '--concurrency'
+      - '80'
+      - '--max-instances'
+      - '5'
+      - '--min-instances'
+      - '1'
+      - '--timeout'
+      - '300s'
+      - '--service-account'
+      - 'agent-os@sentilyze-v6-clean.iam.gserviceaccount.com'
+      - '--set-env-vars'
+      - 'ENABLE_VERTEX_AI_FOR_AGENTS=true,CACHE_HIT_TARGET_RATIO=0.80,DOMAIN=agent-os-core-koa62feuuq-uc.a.run.app,ENABLE_TELEGRAM_NOTIFICATIONS=true,ENABLE_MARIA=true,ENABLE_CODER=true,ENABLE_SENTINEL=true,ENABLE_ATLAS=true,ENABLE_BRAINSTORMING=true,ENABLE_CONTENT_PIPELINE=true,ENABLE_AUTONOMOUS_ACTIONS=true'
+      - '--update-secrets'
+      - 'TELEGRAM_BOT_TOKEN=telegram-bot-token:latest,TELEGRAM_CHAT_ID=telegram-chat-id:latest,MOONSHOT_API_KEY=moonshot-api-key:latest'
+      - '--allow-unauthenticated'
+
+images:
+  - 'gcr.io/sentilyze-v6-clean/agent-os-core:autonomous-v1'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
