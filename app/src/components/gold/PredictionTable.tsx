@@ -114,7 +114,7 @@ const PredictionTable: React.FC = () => {
             FİYAT TAHMİN SENARYOLARl
           </h2>
           <p className="text-xs text-[#5F6B7A] mt-1">
-            30 dakika, 1 saat, 3 saat ve 6 saat sonraki fiyat tahminleri (LSTM + ARIMA + XGBoost modelleri)
+            1 saat, 2 saat ve 3 saat sonraki fiyat tahminleri (LSTM + ARIMA + XGBoost modelleri)
           </p>
         </div>
         
