@@ -14,6 +14,7 @@ from src.agents import AGENT_REGISTRY, get_agent, list_agents
 from src.config import settings
 from src.data_bridge import BigQueryDataClient, FirestoreDataClient, PubSubDataClient
 from src.routes.telegram_v2 import router as telegram_router  # Using new unified router
+from src.routes.autonomous import router as autonomous_router  # Brainstorming, content, actions
 from src.utils.telegram_manager import get_telegram_manager
 
 logger = structlog.get_logger(__name__)
@@ -211,6 +212,9 @@ app.add_middleware(
 
 # Include Telegram routes
 app.include_router(telegram_router)
+
+# Include Autonomous system routes (brainstorming, content pipeline, actions)
+app.include_router(autonomous_router)
 
 
 @app.get("/")

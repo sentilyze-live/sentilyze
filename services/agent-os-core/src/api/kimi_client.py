@@ -120,6 +120,71 @@ class KimiClient:
 
             return content
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+    )
+    async def chat(
+        self,
+        messages: List[Dict[str, str]],
+        system_prompt: Optional[str] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+    ) -> str:
+        """Multi-turn conversation using chat/completions.
+
+        Sends a full conversation history to the LLM for contextual responses.
+
+        Args:
+            messages: List of {"role": "user"|"assistant", "content": "..."}
+            system_prompt: System prompt (prepended automatically)
+            temperature: Sampling temperature (0-1)
+            max_tokens: Maximum tokens to generate
+
+        Returns:
+            Assistant response text
+        """
+        full_messages = []
+
+        if system_prompt:
+            full_messages.append({"role": "system", "content": system_prompt})
+
+        full_messages.extend(messages)
+
+        payload = {
+            "model": self.model,
+            "messages": full_messages,
+            "temperature": temperature or self.temperature,
+            "max_tokens": max_tokens or self.max_tokens,
+        }
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            logger.debug(
+                "kimi_client.chat_request",
+                message_count=len(messages),
+                has_system_prompt=bool(system_prompt),
+            )
+
+            response = await client.post(
+                f"{self.base_url}/chat/completions",
+                headers=self.headers,
+                json=payload,
+            )
+
+            response.raise_for_status()
+            data = response.json()
+
+            content = data["choices"][0]["message"]["content"]
+
+            logger.info(
+                "kimi_client.chat_response",
+                message_count=len(messages),
+                response_length=len(content),
+                tokens_used=data.get("usage", {}).get("total_tokens", 0),
+            )
+
+            return content
+
     async def generate_json(
         self,
         prompt: str,

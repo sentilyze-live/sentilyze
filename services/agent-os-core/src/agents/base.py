@@ -1,5 +1,6 @@
 """Base agent class for all Agent OS agents."""
 
+import json
 import uuid
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
@@ -120,6 +121,21 @@ class BaseAgent(ABC):
                 "max_tokens": settings.MOONSHOT_MAX_TOKENS,
                 "temperature": settings.MOONSHOT_TEMPERATURE,
             },
+            "coder": {
+                "model": settings.MOONSHOT_MODEL_CODER,
+                "max_tokens": settings.MOONSHOT_MAX_TOKENS_CODER,
+                "temperature": settings.MOONSHOT_TEMPERATURE_CODER,
+            },
+            "sentinel": {
+                "model": settings.MOONSHOT_MODEL_SENTINEL,
+                "max_tokens": settings.MOONSHOT_MAX_TOKENS_SENTINEL,
+                "temperature": settings.MOONSHOT_TEMPERATURE_SENTINEL,
+            },
+            "atlas": {
+                "model": settings.MOONSHOT_MODEL_ATLAS,
+                "max_tokens": settings.MOONSHOT_MAX_TOKENS_ATLAS,
+                "temperature": settings.MOONSHOT_TEMPERATURE_ATLAS,
+            },
         }
         
         # Get config for this agent or use defaults
@@ -188,8 +204,20 @@ class BaseAgent(ABC):
             # Pre-run setup
             await self._before_run(context)
 
-            # Execute main logic
-            result = await self._execute(context)
+            # Check if this is a conversational follow-up
+            if self.is_conversation_mode():
+                response_text = await self.respond_conversationally(context)
+                await self.reply_to_telegram(response_text)
+                result = {"response": response_text, "mode": "conversation"}
+            else:
+                # Execute main logic
+                result = await self._execute(context)
+
+                # If Telegram-triggered, send a conversational summary
+                if self.is_telegram_triggered() and context:
+                    formatted = await self._format_telegram_response(result, context)
+                    if formatted:
+                        await self.reply_to_telegram(formatted)
 
             # Post-run cleanup
             await self._after_run(result)
@@ -200,19 +228,21 @@ class BaseAgent(ABC):
             # Save state
             await self._save_state(run_id, result, duration)
 
-            # Notify success
-            await self.telegram.notify_agent_run(
-                agent_name=self.name,
-                status="success",
-                duration_seconds=duration,
-                output_summary=self._summarize_result(result),
-            )
+            # Notify success (skip for conversation mode - already sent via Telegram)
+            if not self.is_conversation_mode():
+                await self.telegram.notify_agent_run(
+                    agent_name=self.name,
+                    status="success",
+                    duration_seconds=duration,
+                    output_summary=self._summarize_result(result),
+                )
 
             logger.info(
                 "agent.run_completed",
                 agent_type=self.agent_type,
                 run_id=run_id,
                 duration=duration,
+                mode="conversation" if self.is_conversation_mode() else "execute",
             )
 
             return {
@@ -586,6 +616,22 @@ class BaseAgent(ABC):
             success = result.get("ok", False)
             if success:
                 logger.info("agent.telegram_reply_sent", agent=self.agent_type)
+
+                # Store agent response in conversation history
+                conversation_id = self.telegram_context.get("conversation_id")
+                if conversation_id:
+                    try:
+                        from src.managers.conversation_manager import get_conversation_manager
+                        conv_mgr = get_conversation_manager()
+                        await conv_mgr.add_message(
+                            conversation_id=conversation_id,
+                            chat_id=chat_id,
+                            agent_type=self.agent_type,
+                            role="agent",
+                            content=message,
+                        )
+                    except Exception as conv_err:
+                        logger.warning("agent.conversation_store_failed", error=str(conv_err))
             else:
                 logger.error("agent.telegram_reply_failed", error=result.get("error"))
 
@@ -594,6 +640,116 @@ class BaseAgent(ABC):
         except Exception as e:
             logger.error("agent.telegram_reply_error", error=str(e))
             return False
+
+    def is_conversation_mode(self) -> bool:
+        """Check if this run is a conversation follow-up with history.
+
+        Returns:
+            True if running in conversation mode, False otherwise
+        """
+        if not self.telegram_context:
+            return False
+        return bool(self.telegram_context.get("conversation_history"))
+
+    async def respond_conversationally(self, context: Dict[str, Any]) -> str:
+        """Generate a conversational response using conversation history.
+
+        Builds a multi-turn messages array from the ConversationManager
+        history and sends to KimiClient.chat().
+
+        Args:
+            context: Context with conversation_history and task
+
+        Returns:
+            Conversational response text
+        """
+        history = context.get("conversation_history", [])
+        user_message = context.get("task", "")
+
+        # Build messages array for LLM (last 10 messages to control costs)
+        messages = []
+        for msg in history[-10:]:
+            role = "user" if msg.get("role") == "user" else "assistant"
+            content = msg.get("content", "")
+            if content:
+                messages.append({"role": role, "content": content})
+
+        # Ensure current message is included
+        if not messages or messages[-1].get("content") != user_message:
+            messages.append({"role": "user", "content": user_message})
+
+        # Get conversational system prompt
+        system_prompt = self._get_conversational_system_prompt()
+
+        # Generate response via multi-turn chat
+        response = await self.kimi.chat(
+            messages=messages,
+            system_prompt=system_prompt,
+        )
+
+        return response
+
+    def _get_conversational_system_prompt(self) -> str:
+        """Get conversation-friendly system prompt.
+
+        Override in subclasses for agent-specific conversational personality.
+
+        Returns:
+            Conversational system prompt
+        """
+        return f"""You are {self.name}, part of the Sentilyze AI team.
+You are having a natural conversation via Telegram.
+
+RULES:
+- Respond naturally and conversationally in the user's language
+- Reference previous messages when relevant
+- Keep responses concise (Telegram format, max ~500 chars)
+- Be helpful and proactive
+- If you need clarification, ask
+- Use your domain expertise: {self.description}
+
+You can use HTML formatting: <b>bold</b>, <i>italic</i>, <code>code</code>"""
+
+    async def _format_telegram_response(
+        self,
+        result: Dict[str, Any],
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Optional[str]:
+        """Format execution result as a conversational Telegram message.
+
+        Uses the LLM to generate a natural-sounding summary of the
+        structured result for Telegram.
+
+        Override in subclasses for agent-specific formatting.
+
+        Args:
+            result: Execution results dict
+            context: Optional context with task info
+
+        Returns:
+            Formatted message string or None
+        """
+        task = context.get("task", "") if context else ""
+
+        # Truncate result for prompt
+        result_str = json.dumps(result, indent=2, default=str)[:2000]
+
+        prompt = f"""Summarize this agent result into a natural, conversational Telegram message.
+The user asked: "{task}"
+
+Result data:
+{result_str}
+
+Write a concise, helpful response in the user's language. Use HTML formatting (<b>, <i>, <code>). Max 500 chars."""
+
+        try:
+            return await self.kimi.generate(
+                prompt=prompt,
+                system_prompt=self._get_conversational_system_prompt(),
+                max_tokens=500,
+            )
+        except Exception:
+            return self._summarize_result(result)
 
     def is_telegram_triggered(self) -> bool:
         """Check if this agent run was triggered via Telegram.

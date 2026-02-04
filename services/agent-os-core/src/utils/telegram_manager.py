@@ -77,6 +77,9 @@ class TelegramManager:
         "zara": r"@ZARA\b",
         "elon": r"@ELON\b",
         "maria": r"@MARIA\b",
+        "coder": r"@CODER\b",
+        "sentinel": r"@SENTINEL\b",
+        "atlas": r"@ATLAS\b",
     }
 
     # Broadcast patterns (@all, @herkes)

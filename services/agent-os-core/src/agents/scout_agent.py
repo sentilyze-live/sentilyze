@@ -72,6 +72,10 @@ OUTPUT: JSON with opportunity_score, recommended_action, target_agents, content_
         self.opportunity_threshold = 7.0
         self.sentiment_shift_threshold = 0.20  # 20% change
 
+    def _get_conversational_system_prompt(self) -> str:
+        from src.prompts.system_prompts import get_conversational_prompt
+        return get_conversational_prompt(self.agent_type)
+
     async def _execute(self, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Execute SCOUT market intelligence workflow.
 

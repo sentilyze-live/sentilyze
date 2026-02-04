@@ -6,6 +6,10 @@ from .elon_agent import ElonAgent
 from .seth_agent import SethAgent
 from .zara_agent import ZaraAgent
 from .oracle_agent import OracleAgent
+from .coder_agent import CoderAgent
+from .maria_agent import MariaAgent
+from .sentinel_agent import SentinelAgent
+from .atlas_agent import AtlasAgent
 
 __all__ = [
     "BaseAgent",
@@ -14,6 +18,10 @@ __all__ = [
     "SethAgent",
     "ZaraAgent",
     "OracleAgent",
+    "CoderAgent",
+    "MariaAgent",
+    "SentinelAgent",
+    "AtlasAgent",
 ]
 
 # Agent registry
@@ -23,6 +31,10 @@ AGENT_REGISTRY = {
     "seth": SethAgent,
     "zara": ZaraAgent,
     "oracle": OracleAgent,
+    "coder": CoderAgent,
+    "maria": MariaAgent,
+    "sentinel": SentinelAgent,
+    "atlas": AtlasAgent,
 }
 
 

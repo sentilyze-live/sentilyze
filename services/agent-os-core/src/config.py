@@ -85,6 +85,21 @@ class Settings(BaseSettings):
     MOONSHOT_MAX_TOKENS_ELON: int = 3000
     MOONSHOT_TEMPERATURE_ELON: float = 0.7
 
+    # CODER: Developer agent - deep reasoning for code analysis
+    MOONSHOT_MODEL_CODER: str = "kimi-k2-thinking"
+    MOONSHOT_MAX_TOKENS_CODER: int = 6000
+    MOONSHOT_TEMPERATURE_CODER: float = 0.3
+
+    # SENTINEL: Anomaly detection - deep reasoning for pattern analysis
+    MOONSHOT_MODEL_SENTINEL: str = "kimi-k2-thinking"
+    MOONSHOT_MAX_TOKENS_SENTINEL: int = 3000
+    MOONSHOT_TEMPERATURE_SENTINEL: float = 0.4
+
+    # ATLAS: Data quality - structured output, cost-effective
+    MOONSHOT_MODEL_ATLAS: str = "kimi-k2-0905-preview"
+    MOONSHOT_MAX_TOKENS_ATLAS: int = 2000
+    MOONSHOT_TEMPERATURE_ATLAS: float = 0.3
+
     # Higgsfield API
     HIGGSFIELD_API_KEY: str = Field(default="", description="Higgsfield API Key")
     HIGGSFIELD_BASE_URL: str = "https://api.higgsfield.ai/v1"
@@ -147,6 +162,43 @@ class Settings(BaseSettings):
     ENABLE_SETH: bool = True
     ENABLE_ZARA: bool = True
     ENABLE_ORACLE: bool = True
+    ENABLE_CODER: bool = True
+    ENABLE_SENTINEL: bool = True
+    ENABLE_ATLAS: bool = True
+    ENABLE_MARIA: bool = True
+
+    # CODER Agent Settings
+    CODER_PROJECT_ROOT: str = "/app"
+    CODER_REQUIRE_APPROVAL: bool = True
+
+    # SENTINEL Agent Settings
+    SENTINEL_INTERVAL_MINUTES: int = 120
+    SENTINEL_ZSCORE_THRESHOLD: float = 2.5
+
+    # ATLAS Agent Settings
+    ATLAS_INTERVAL_MINUTES: int = 360
+    ATLAS_STALENESS_THRESHOLD_MINUTES: int = 180
+
+    # Telegram Rate Limiting
+    TELEGRAM_RATE_LIMIT_PER_MINUTE: int = 5
+    TELEGRAM_RATE_LIMIT_PER_HOUR: int = 50
+
+    # Autonomous Brainstorming
+    ENABLE_BRAINSTORMING: bool = True
+    BRAINSTORMING_INTERVAL_HOURS: int = 48  # Every 2 days
+    BRAINSTORMING_MAX_PROPOSALS: int = 15
+    BRAINSTORMING_AUTO_DISPATCH: bool = True  # Auto-dispatch executable proposals
+
+    # Content Pipeline
+    ENABLE_CONTENT_PIPELINE: bool = True
+    CONTENT_PLATFORMS: str = "blog,linkedin,twitter,reddit,discord"
+    CONTENT_AUTO_PUBLISH_SOCIAL: bool = True  # Auto-publish Twitter/Reddit/Discord
+    CONTENT_REQUIRE_REVIEW_BLOG: bool = True  # Blog needs manual review
+    CONTENT_REQUIRE_REVIEW_LINKEDIN: bool = True  # LinkedIn needs manual review
+
+    # Autonomous Actions
+    ENABLE_AUTONOMOUS_ACTIONS: bool = True
+    AUTONOMOUS_ACTION_EXPIRY_HOURS: int = 48  # Pending actions expire after 48h
 
     # Agent Scheduling (minutes) - FULLY OPTIMIZED FOR COST (70% reduction)
     # OPTIMIZATION: Reduced frequencies by 50-70% with smart triggering
@@ -219,6 +271,14 @@ class Settings(BaseSettings):
             agents.append("zara")
         if self.ENABLE_ORACLE:
             agents.append("oracle")
+        if self.ENABLE_CODER:
+            agents.append("coder")
+        if self.ENABLE_SENTINEL:
+            agents.append("sentinel")
+        if self.ENABLE_ATLAS:
+            agents.append("atlas")
+        if self.ENABLE_MARIA:
+            agents.append("maria")
         return agents
 
 

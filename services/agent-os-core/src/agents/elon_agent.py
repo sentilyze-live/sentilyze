@@ -84,6 +84,10 @@ OUTPUT: Experiment proposals with ICE scores, implementation plans, and agent co
             "referral_rate": 0.10,  # 10%
         }
 
+    def _get_conversational_system_prompt(self) -> str:
+        from src.prompts.system_prompts import get_conversational_prompt
+        return get_conversational_prompt(self.agent_type)
+
     async def _execute(self, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Execute ELON growth experimentation workflow.
 

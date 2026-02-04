@@ -140,6 +140,10 @@ OUTPUT: SEO-optimized blog posts with complete metadata, keyword strategy, and i
             },
         }
 
+    def _get_conversational_system_prompt(self) -> str:
+        from src.prompts.system_prompts import get_conversational_prompt
+        return get_conversational_prompt(self.agent_type)
+
     async def _execute(self, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Execute SETH content creation workflow.
 

@@ -34,6 +34,8 @@ class FirestoreDataClient:
             logger.info("firestore_client.initialized", project=self.project_id)
 
         # Collection references
+        self.conversations_collection = self.client.collection("agent_os_conversations")
+        self.messages_collection = self.client.collection("agent_os_messages")
         self.trends_collection = self.client.collection("agent_os_trends")
         self.content_collection = self.client.collection("agent_os_content")
         self.experiments_collection = self.client.collection("agent_os_experiments")
@@ -639,3 +641,244 @@ class FirestoreDataClient:
 
         except Exception as e:
             logger.error("firestore.delete_document_error", collection=collection, document_id=document_id, error=str(e))
+
+    # ═══════════════════════════════════════════════════════════════════
+    # Conversation Management Methods
+    # ═══════════════════════════════════════════════════════════════════
+
+    async def save_conversation(
+        self,
+        conversation_id: str,
+        data: Dict[str, Any],
+    ) -> None:
+        """Save or update conversation data.
+
+        Args:
+            conversation_id: Unique conversation ID
+            data: Conversation data
+        """
+        try:
+            data["updated_at"] = datetime.utcnow()
+            self.conversations_collection.document(conversation_id).set(data, merge=True)
+            logger.debug("firestore.conversation_saved", conversation_id=conversation_id)
+        except Exception as e:
+            logger.error("firestore.conversation_save_error", conversation_id=conversation_id, error=str(e))
+
+    async def get_conversation(
+        self,
+        conversation_id: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Get conversation by ID.
+
+        Args:
+            conversation_id: Conversation ID
+
+        Returns:
+            Conversation data or None
+        """
+        try:
+            doc = self.conversations_collection.document(conversation_id).get()
+            if doc.exists:
+                data = doc.to_dict()
+                data["conversation_id"] = doc.id
+                return data
+            return None
+        except Exception as e:
+            logger.error("firestore.conversation_get_error", conversation_id=conversation_id, error=str(e))
+            return None
+
+    async def get_active_conversation(
+        self,
+        chat_id: str,
+        agent_type: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Find active conversation for a chat+agent pair.
+
+        Args:
+            chat_id: Telegram chat ID
+            agent_type: Agent type
+
+        Returns:
+            Active conversation data or None
+        """
+        try:
+            query = (
+                self.conversations_collection
+                .where("chat_id", "==", chat_id)
+                .where("agent_type", "==", agent_type)
+                .where("status", "==", "active")
+                .order_by("last_message_at", direction=firestore.Query.DESCENDING)
+                .limit(1)
+            )
+            docs = list(query.stream())
+            if docs:
+                data = docs[0].to_dict()
+                data["conversation_id"] = docs[0].id
+                # Check expiry
+                expires_at = data.get("expires_at")
+                if isinstance(expires_at, datetime):
+                    if expires_at > datetime.utcnow():
+                        return data
+                elif isinstance(expires_at, str):
+                    if datetime.fromisoformat(expires_at) > datetime.utcnow():
+                        return data
+            return None
+        except Exception as e:
+            logger.error(
+                "firestore.active_conversation_error",
+                chat_id=chat_id,
+                agent_type=agent_type,
+                error=str(e),
+            )
+            return None
+
+    async def get_any_active_conversation(
+        self,
+        chat_id: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Find any active conversation for a chat, regardless of agent type.
+
+        Finds the most recently active conversation for this chat.
+
+        Args:
+            chat_id: Telegram chat ID
+
+        Returns:
+            Active conversation data or None
+        """
+        try:
+            query = (
+                self.conversations_collection
+                .where("chat_id", "==", chat_id)
+                .where("status", "==", "active")
+                .order_by("last_message_at", direction=firestore.Query.DESCENDING)
+                .limit(1)
+            )
+            docs = list(query.stream())
+            if docs:
+                data = docs[0].to_dict()
+                data["conversation_id"] = docs[0].id
+                # Check expiry
+                expires_at = data.get("expires_at")
+                if isinstance(expires_at, datetime):
+                    if expires_at > datetime.utcnow():
+                        return data
+                elif isinstance(expires_at, str):
+                    if datetime.fromisoformat(expires_at) > datetime.utcnow():
+                        return data
+            return None
+        except Exception as e:
+            logger.error("firestore.any_active_conversation_error", chat_id=chat_id, error=str(e))
+            return None
+
+    async def save_message(
+        self,
+        message_id: str,
+        data: Dict[str, Any],
+    ) -> None:
+        """Save conversation message.
+
+        Args:
+            message_id: Unique message ID
+            data: Message data
+        """
+        try:
+            data["created_at"] = datetime.utcnow()
+            self.messages_collection.document(message_id).set(data)
+            logger.debug("firestore.message_saved", message_id=message_id)
+        except Exception as e:
+            logger.error("firestore.message_save_error", message_id=message_id, error=str(e))
+
+    async def get_messages(
+        self,
+        conversation_id: str,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """Get messages for a conversation, ordered chronologically.
+
+        Args:
+            conversation_id: Conversation ID
+            limit: Maximum messages to return
+
+        Returns:
+            List of messages
+        """
+        try:
+            query = (
+                self.messages_collection
+                .where("conversation_id", "==", conversation_id)
+                .order_by("created_at")
+                .limit(limit)
+            )
+            messages = []
+            for doc in query.stream():
+                data = doc.to_dict()
+                data["id"] = doc.id
+                messages.append(data)
+            logger.debug("firestore.messages_loaded", conversation_id=conversation_id, count=len(messages))
+            return messages
+        except Exception as e:
+            logger.error("firestore.messages_load_error", conversation_id=conversation_id, error=str(e))
+            return []
+
+    async def update_conversation_status(
+        self,
+        conversation_id: str,
+        status: str,
+    ) -> None:
+        """Update conversation status.
+
+        Args:
+            conversation_id: Conversation ID
+            status: New status (active, timeout, completed, user_ended)
+        """
+        try:
+            self.conversations_collection.document(conversation_id).update({
+                "status": status,
+                "updated_at": datetime.utcnow(),
+            })
+            logger.info("firestore.conversation_status_updated", conversation_id=conversation_id, status=status)
+        except Exception as e:
+            logger.error("firestore.conversation_status_error", conversation_id=conversation_id, error=str(e))
+
+    async def mark_message_read(
+        self,
+        message_id: str,
+    ) -> None:
+        """Mark message as read.
+
+        Args:
+            message_id: Message ID
+        """
+        try:
+            self.messages_collection.document(message_id).update({
+                "status": "read",
+                "read_at": datetime.utcnow(),
+            })
+            logger.debug("firestore.message_marked_read", message_id=message_id)
+        except Exception as e:
+            logger.error("firestore.message_read_error", message_id=message_id, error=str(e))
+
+    async def cleanup_expired_conversations(self) -> int:
+        """Cleanup expired active conversations.
+
+        Returns:
+            Number of cleaned conversations
+        """
+        try:
+            now = datetime.utcnow()
+            query = self.conversations_collection.where("status", "==", "active")
+            count = 0
+            for doc in query.stream():
+                data = doc.to_dict()
+                expires_at = data.get("expires_at")
+                if isinstance(expires_at, str):
+                    expires_at = datetime.fromisoformat(expires_at)
+                if isinstance(expires_at, datetime) and expires_at < now:
+                    doc.reference.update({"status": "timeout", "updated_at": now})
+                    count += 1
+            logger.info("firestore.conversations_cleaned", count=count)
+            return count
+        except Exception as e:
+            logger.error("firestore.conversation_cleanup_error", error=str(e))
+            return 0
