@@ -144,7 +144,8 @@ class Settings(BaseSettings):
     scheduler_cryptopanic_interval: int = Field(default=300, alias="SCHEDULER_CRYPTOPANIC_INTERVAL")
     scheduler_santiment_interval: int = Field(default=300, alias="SCHEDULER_SANTIMENT_INTERVAL")
     scheduler_fred_interval: int = Field(default=300, alias="SCHEDULER_FRED_INTERVAL")
-    
+    scheduler_yfinance_interval: int = Field(default=3600, alias="SCHEDULER_YFINANCE_INTERVAL")
+
     # GoldAPI/Finnhub settings
     goldapi_symbols: Optional[list[str]] = Field(default=None, alias="GOLDAPI_SYMBOLS")
     goldapi_currencies: Optional[list[str]] = Field(default=None, alias="GOLDAPI_CURRENCIES")
@@ -161,7 +162,13 @@ class Settings(BaseSettings):
     santiment_interval: int = Field(default=300, alias="SANTIMENT_INTERVAL")
     fred_series: Optional[dict] = Field(default=None, alias="FRED_SERIES")
     fred_interval: int = Field(default=300, alias="FRED_INTERVAL")
-    
+
+    # yfinance settings
+    yfinance_symbols: Optional[dict] = Field(default=None, alias="YFINANCE_SYMBOLS")
+    yfinance_period: str = Field(default="1d", alias="YFINANCE_PERIOD")
+    yfinance_data_interval: str = Field(default="1h", alias="YFINANCE_DATA_INTERVAL")
+    yfinance_interval: int = Field(default=3600, alias="YFINANCE_INTERVAL")
+
     # Circuit breaker settings (ingestion specific)
     circuit_failure_threshold: int = Field(default=5, alias="CIRCUIT_FAILURE_THRESHOLD")
     circuit_recovery_timeout: int = Field(default=60, alias="CIRCUIT_RECOVERY_TIMEOUT")
@@ -289,7 +296,13 @@ class Settings(BaseSettings):
     enable_crypto_predictions: bool = Field(default=True, alias="ENABLE_CRYPTO_PREDICTIONS")
     enable_gold_predictions: bool = Field(default=True, alias="ENABLE_GOLD_PREDICTIONS")
     enable_auto_retraining: bool = Field(default=False, alias="ENABLE_AUTO_RETRAINING")
-    
+
+    # Advanced ML models (Phase 2) - Disabled by default for cost control
+    enable_lstm_model: bool = Field(default=False, alias="ENABLE_LSTM_MODEL")
+    enable_arima_model: bool = Field(default=False, alias="ENABLE_ARIMA_MODEL")
+    enable_xgboost_model: bool = Field(default=False, alias="ENABLE_XGBOOST_MODEL")
+    enable_ensemble_predictions: bool = Field(default=False, alias="ENABLE_ENSEMBLE_PREDICTIONS")
+
     # =============================================================================
     # Analytics Engine Settings
     # =============================================================================
@@ -440,6 +453,7 @@ class Settings(BaseSettings):
     enable_cryptopanic_collector: bool = Field(default=True, alias="ENABLE_CRYPTOPANIC_COLLECTOR")
     enable_santiment_collector: bool = Field(default=True, alias="ENABLE_SANTIMENT_COLLECTOR")
     enable_fred_collector: bool = Field(default=True, alias="ENABLE_FRED_COLLECTOR")
+    enable_yfinance_collector: bool = Field(default=True, alias="ENABLE_YFINANCE_COLLECTOR")
 
     # =============================================================================
     # Feature Flags - Gold/Metals Market

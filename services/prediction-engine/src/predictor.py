@@ -1,6 +1,7 @@
 """Prediction engine with technical indicators and ML."""
 
 import os
+from datetime import datetime, timedelta
 from typing import Optional
 
 import numpy as np
@@ -155,14 +156,124 @@ class TechnicalAnalyzer:
         return float(np.mean(signals))
 
 
+class EconomicDataFetcher:
+    """Fetches economic data for ML features from BigQuery."""
+
+    def __init__(self):
+        self._cache = {}
+        self._cache_ttl = 3600  # 1 hour cache
+        self._last_fetch = None
+
+    async def fetch_economic_features(self) -> dict:
+        """Fetch latest economic indicators from BigQuery.
+
+        Returns economic data including:
+        - DXY (USD Index)
+        - Treasury 10Y yield
+        - CPI (inflation)
+        - WTI Oil price
+        - VIX (volatility index)
+        - S&P 500 level
+        """
+        # Check cache
+        if self._cache and self._last_fetch:
+            time_since_fetch = (datetime.now() - self._last_fetch).total_seconds()
+            if time_since_fetch < self._cache_ttl:
+                return self._cache
+
+        try:
+            from google.cloud import bigquery
+            from sentilyze_core import get_settings
+
+            settings_core = get_settings()
+            client = bigquery.Client(project=settings_core.google_cloud_project)
+
+            # Query latest economic data from market_context table
+            query = """
+            SELECT
+                symbol,
+                payload.value as value,
+                timestamp
+            FROM `{project}.{dataset}.raw_events`
+            WHERE event_type IN ('economic_data', 'market_data', 'volatility_index', 'equity_index', 'currency_index')
+              AND timestamp > TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)
+              AND symbol IN ('DTWEXBGS', 'DGS10', 'CPIAUCSL', 'CL=F', '^VIX', '^GSPC', 'DX-Y.NYB', 'WTI')
+            ORDER BY timestamp DESC
+            """.format(
+                project=settings_core.google_cloud_project,
+                dataset=settings_core.bigquery_dataset
+            )
+
+            query_job = client.query(query)
+            results = query_job.result()
+
+            # Parse results
+            economic_data = {
+                'dxy': None,            # USD Index (inverse correlation with gold)
+                'treasury_10y': None,   # 10Y Treasury yield
+                'cpi': None,            # Inflation
+                'wti_oil': None,        # Oil price
+                'vix': None,            # Volatility index
+                'sp500': None,          # S&P 500 (risk sentiment)
+            }
+
+            seen = set()
+            for row in results:
+                symbol = row.symbol
+                value = row.value
+
+                # Map symbols to our keys (take first value only)
+                if symbol == 'DTWEXBGS' and 'dxy' not in seen:
+                    economic_data['dxy'] = float(value) if value else None
+                    seen.add('dxy')
+                elif symbol == 'DX-Y.NYB' and 'dxy' not in seen:
+                    economic_data['dxy'] = float(value) if value else None
+                    seen.add('dxy')
+                elif symbol == 'DGS10' and 'treasury_10y' not in seen:
+                    economic_data['treasury_10y'] = float(value) if value else None
+                    seen.add('treasury_10y')
+                elif symbol == 'CPIAUCSL' and 'cpi' not in seen:
+                    economic_data['cpi'] = float(value) if value else None
+                    seen.add('cpi')
+                elif symbol in ['CL=F', 'WTI'] and 'wti_oil' not in seen:
+                    economic_data['wti_oil'] = float(value) if value else None
+                    seen.add('wti_oil')
+                elif symbol == '^VIX' and 'vix' not in seen:
+                    economic_data['vix'] = float(value) if value else None
+                    seen.add('vix')
+                elif symbol == '^GSPC' and 'sp500' not in seen:
+                    economic_data['sp500'] = float(value) if value else None
+                    seen.add('sp500')
+
+            # Cache results
+            self._cache = economic_data
+            self._last_fetch = datetime.now()
+
+            logger.info("Fetched economic features", data=economic_data)
+            return economic_data
+
+        except Exception as e:
+            logger.error(f"Failed to fetch economic features: {e}")
+            # Return default values if fetch fails
+            return {
+                'dxy': None,
+                'treasury_10y': None,
+                'cpi': None,
+                'wti_oil': None,
+                'vix': None,
+                'sp500': None,
+            }
+
+
 class MLPredictor:
-    """ML-based price predictor using Random Forest."""
-    
+    """ML-based price predictor using Random Forest with economic features."""
+
     def __init__(self):
         self.model: Optional[RandomForestRegressor] = None
         self.scaler: Optional[StandardScaler] = None
         self._initialized = False
-        
+        self.economic_fetcher = EconomicDataFetcher()
+
         if SKLEARN_AVAILABLE and settings.enable_ml_predictions:
             self._init_model()
     
@@ -182,25 +293,64 @@ class MLPredictor:
             logger.error(f"Failed to initialize ML model: {e}")
             self._initialized = False
     
-    def predict(
+    async def predict(
         self,
         indicators: TechnicalIndicators,
         sentiment_score: float,
         current_price: float,
+        economic_data: Optional[dict] = None,
     ) -> float:
-        """Make ML prediction."""
+        """Make ML prediction with economic features.
+
+        Args:
+            indicators: Technical indicators
+            sentiment_score: Sentiment score (-1 to 1)
+            current_price: Current price
+            economic_data: Optional economic data dict (fetched if None)
+
+        Returns:
+            Prediction signal (-1 to 1)
+        """
         if not self._initialized or not SKLEARN_AVAILABLE:
             return 0.0
-        
+
         try:
+            # Fetch economic data if not provided
+            if economic_data is None:
+                economic_data = await self.economic_fetcher.fetch_economic_features()
+
+            # Normalize economic data (handle None values)
+            dxy_norm = (economic_data.get('dxy') or 100) / 100.0  # Typical range 90-110
+            treasury_norm = (economic_data.get('treasury_10y') or 3.0) / 5.0  # Typical range 0-5%
+            cpi_norm = (economic_data.get('cpi') or 300) / 300.0  # Typical range 250-350
+            oil_norm = (economic_data.get('wti_oil') or 70) / 100.0  # Typical range 50-100
+            vix_norm = (economic_data.get('vix') or 15) / 30.0  # Typical range 10-30
+            sp500_norm = (economic_data.get('sp500') or 4500) / 5000.0  # Typical range 3000-5000
+
+            # Build feature vector (15 features vs original 5)
             features = np.array([[
+                # Original technical + sentiment features (5)
                 indicators.rsi or 50,
                 indicators.macd or 0,
                 indicators.ema_short or current_price,
                 indicators.ema_medium or current_price,
                 sentiment_score,
+
+                # New economic features (6)
+                dxy_norm,           # USD strength (inverse correlation with gold)
+                treasury_norm,      # Interest rates (inverse correlation)
+                cpi_norm,           # Inflation (positive correlation)
+                oil_norm,           # Energy prices (inflation indicator)
+                vix_norm,           # Market fear (positive correlation)
+                sp500_norm,         # Risk sentiment (inverse correlation)
+
+                # Derived features (4)
+                (indicators.ema_short or current_price) - (indicators.ema_medium or current_price),  # EMA spread
+                dxy_norm * treasury_norm,  # USD-interest rate interaction
+                vix_norm / (sp500_norm + 0.01),  # Fear-to-equity ratio
+                cpi_norm * oil_norm,  # Inflation-energy interaction
             ]])
-            
+
             prediction = self.model.predict(features)[0]
             return float(prediction)
         except Exception as e:
@@ -215,7 +365,7 @@ class PredictionEngine:
         self.technical_analyzer = TechnicalAnalyzer()
         self.ml_predictor = MLPredictor()
     
-    def generate_prediction(
+    async def generate_prediction(
         self,
         symbol: str,
         current_price: float,
@@ -223,20 +373,34 @@ class PredictionEngine:
         sentiment_score: float,
         prediction_type: str,
         market_type: str = "generic",
+        economic_data: Optional[dict] = None,
     ) -> dict:
-        """Generate price prediction."""
-        
+        """Generate price prediction with economic features.
+
+        Args:
+            symbol: Asset symbol
+            current_price: Current price
+            prices: Historical prices
+            sentiment_score: Sentiment score
+            prediction_type: Prediction timeframe (1h, 2h, 3h, 4h)
+            market_type: Market type (crypto, gold, generic)
+            economic_data: Optional pre-fetched economic data
+
+        Returns:
+            Prediction dictionary with price, direction, confidence
+        """
+
         # Calculate technical indicators
         indicators = self.technical_analyzer.calculate_indicators(prices)
-        
+
         # Technical signal
         technical_signal = self.technical_analyzer.calculate_technical_signal(indicators)
-        
-        # ML prediction
+
+        # ML prediction with economic features
         ml_prediction = 0.0
         if settings.enable_ml_predictions:
-            ml_prediction = self.ml_predictor.predict(
-                indicators, sentiment_score, current_price
+            ml_prediction = await self.ml_predictor.predict(
+                indicators, sentiment_score, current_price, economic_data
             )
         
         # Weighted combination
