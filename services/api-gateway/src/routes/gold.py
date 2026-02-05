@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 from typing import Any, Optional
 
 import httpx
-import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from ..auth import (
@@ -582,11 +581,11 @@ async def get_gold_predictions(
             # Prepare feature history for LSTM (if enabled)
             feature_history = None
             if settings.enable_lstm_model and len(prices) >= 30:
-                # Build feature matrix (30 days x 10 features)
-                feature_history = np.zeros((30, 10))
+                # Build feature matrix (30 days x 10 features) as list of lists
+                feature_history = []
                 for i in range(30):
                     idx = -(30 - i)
-                    feature_history[i] = [
+                    feature_history.append([
                         prices[idx] if idx < 0 else current_price,
                         economic_data.get('dxy', 100) / 100.0,
                         economic_data.get('treasury_10y', 3.0) / 5.0,
@@ -597,10 +596,10 @@ async def get_gold_predictions(
                         indicators.rsi or 50,
                         indicators.macd or 0,
                         indicators.ema_short or current_price,
-                    ]
+                    ])
 
-            # Price history for ARIMA
-            price_array = np.array(prices[-100:]) if len(prices) >= 100 else np.array(prices)
+            # Price history for ARIMA (pass as list, model will convert if needed)
+            price_array = prices[-100:] if len(prices) >= 100 else prices
 
             # Generate predictions for each timeframe
             for tf in timeframes:
@@ -763,10 +762,10 @@ async def get_prediction_scenarios(
         # Prepare feature history for LSTM
         feature_history = None
         if settings.enable_lstm_model and len(prices) >= 30:
-            feature_history = np.zeros((30, 10))
+            feature_history = []
             for i in range(30):
                 idx = -(30 - i)
-                feature_history[i] = [
+                feature_history.append([
                     prices[idx] if idx < 0 else current_price,
                     economic_data.get('dxy', 100) / 100.0,
                     economic_data.get('treasury_10y', 3.0) / 5.0,
@@ -777,9 +776,9 @@ async def get_prediction_scenarios(
                     indicators.rsi or 50,
                     indicators.macd or 0,
                     indicators.ema_short or current_price,
-                ]
+                ])
 
-        price_array = np.array(prices[-100:]) if len(prices) >= 100 else np.array(prices)
+        price_array = prices[-100:] if len(prices) >= 100 else prices
 
         # Generate real scenarios
         scenarios = []
