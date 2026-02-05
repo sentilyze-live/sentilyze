@@ -30,6 +30,7 @@ from .config import (
 from .models import PredictionResult, TechnicalIndicators
 from .predictor import PredictionEngine
 from .publisher import PredictionPublisher
+from .ensemble import EnsemblePredictor
 
 logger = get_logger(__name__)
 settings = get_prediction_settings()
@@ -39,6 +40,7 @@ SERVICE_VERSION = "3.0.0"
 
 # Global instances
 prediction_engine: PredictionEngine | None = None
+ensemble_predictor: EnsemblePredictor | None = None
 publisher: PredictionPublisher | None = None
 pubsub_client: PubSubClient | None = None
 bigquery_client: BigQueryClient | None = None
@@ -88,7 +90,7 @@ class BatchPredictionResponse(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager."""
-    global prediction_engine, publisher, pubsub_client, bigquery_client
+    global prediction_engine, ensemble_predictor, publisher, pubsub_client, bigquery_client
 
     configure_logging(
         log_level=settings.log_level,
@@ -106,10 +108,28 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Initialize engine
     prediction_engine = PredictionEngine()
 
+    # Initialize ensemble predictor if enabled
+    if settings.enable_ensemble_predictions:
+        try:
+            ensemble_predictor = EnsemblePredictor(
+                enable_lstm=settings.enable_lstm_model,
+                enable_arima=settings.enable_arima_model,
+                enable_xgboost=settings.enable_xgboost_model,
+                enable_random_forest=True,
+            )
+            logger.info("Ensemble predictor initialized",
+                       lstm=settings.enable_lstm_model,
+                       arima=settings.enable_arima_model,
+                       xgboost=settings.enable_xgboost_model)
+        except Exception as e:
+            logger.error("Failed to initialize ensemble predictor", error=str(e))
+            ensemble_predictor = None
+
     logger.info(
         "Service initialized",
         ml_enabled=settings.enable_ml_predictions,
         technical_enabled=settings.enable_technical_analysis,
+        ensemble_enabled=ensemble_predictor is not None,
     )
 
     yield
@@ -301,6 +321,77 @@ async def generate_batch_predictions(request: BatchPredictionRequest):
         )
 
 
+class EnsemblePredictionRequest(BaseModel):
+    """Request for ensemble prediction with historical data."""
+    symbol: str = Field(..., description="Trading symbol")
+    current_price: float = Field(..., description="Current price")
+    indicators: dict = Field(..., description="Technical indicators")
+    sentiment_score: float = Field(default=0.0, description="Sentiment score")
+    economic_data: Optional[dict] = Field(default=None, description="Economic indicators")
+    price_history: Optional[list[float]] = Field(default=None, description="Price history for ARIMA")
+    feature_history: Optional[list[list[float]]] = Field(default=None, description="Feature history for LSTM")
+
+
+class EnsemblePredictionResponse(BaseModel):
+    """Response from ensemble prediction."""
+    symbol: str
+    ensemble_price: float
+    confidence: str
+    num_models: int
+    models: dict
+    timestamp: str
+
+
+@app.post("/predict/ensemble", response_model=EnsemblePredictionResponse, tags=["predictions"])
+async def generate_ensemble_prediction(request: EnsemblePredictionRequest):
+    """Generate ensemble prediction using LSTM, ARIMA, XGBoost, and Random Forest."""
+    if not ensemble_predictor:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Ensemble predictor not initialized. Enable with ENABLE_ENSEMBLE_PREDICTIONS=True",
+        )
+
+    try:
+        # Convert dict to TechnicalIndicators
+        from .predictor import TechnicalAnalyzer
+        indicators_obj = TechnicalAnalyzer.TechnicalIndicators(
+            rsi=request.indicators.get('rsi'),
+            macd=request.indicators.get('macd'),
+            macd_signal=request.indicators.get('macd_signal'),
+            macd_histogram=request.indicators.get('macd_histogram'),
+            bb_upper=request.indicators.get('bb_upper'),
+            bb_middle=request.indicators.get('bb_middle'),
+            bb_lower=request.indicators.get('bb_lower'),
+            ema_short=request.indicators.get('ema_short', 0.0),
+            ema_medium=request.indicators.get('ema_medium', 0.0),
+            ema_long=request.indicators.get('ema_long', 0.0),
+        )
+
+        result = await ensemble_predictor.predict(
+            indicators=indicators_obj,
+            sentiment_score=request.sentiment_score,
+            current_price=request.current_price,
+            economic_data=request.economic_data or {},
+            price_history=request.price_history,
+            feature_history=request.feature_history,
+        )
+
+        return EnsemblePredictionResponse(
+            symbol=request.symbol,
+            ensemble_price=result['ensemble_price'],
+            confidence=result['confidence'],
+            num_models=result['num_models'],
+            models=result['models'],
+            timestamp=datetime.utcnow().isoformat(),
+        )
+    except Exception as e:
+        logger.error("Ensemble prediction failed", error=str(e), symbol=request.symbol)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ensemble prediction failed: {str(e)}",
+        )
+
+
 @app.get("/status", tags=["status"])
 async def get_status() -> dict:
     """Get service status."""
@@ -311,6 +402,13 @@ async def get_status() -> dict:
         "crypto_enabled": settings.enable_crypto_predictions,
         "gold_enabled": settings.enable_gold_predictions,
         "engine_ready": prediction_engine is not None,
+        "ensemble_enabled": ensemble_predictor is not None,
+        "models": {
+            "lstm": settings.enable_lstm_model if ensemble_predictor else False,
+            "arima": settings.enable_arima_model if ensemble_predictor else False,
+            "xgboost": settings.enable_xgboost_model if ensemble_predictor else False,
+            "random_forest": True if ensemble_predictor else False,
+        },
     }
 
 
