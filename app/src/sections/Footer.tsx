@@ -1,12 +1,15 @@
 import { useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { Twitter, Github, Linkedin, MessageCircle, AlertTriangle } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
+import { useCookieConsent } from '@/hooks/useCookieConsent';
 
 gsap.registerPlugin(ScrollTrigger);
 
 const Footer = () => {
   const footerRef = useRef<HTMLDivElement>(null);
+  const { openSettings } = useCookieConsent();
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -41,39 +44,17 @@ const Footer = () => {
         }
       );
 
-      // Social icons
-      gsap.fromTo(
-        '.social-icon',
-        { scale: 0, opacity: 0 },
-        {
-          scale: 1,
-          opacity: 1,
-          duration: 0.4,
-          stagger: 0.08,
-          ease: 'back.out(1.7)',
-          scrollTrigger: {
-            trigger: footerRef.current,
-            start: 'top 80%',
-          },
-        }
-      );
     }, footerRef);
 
     return () => ctx.revert();
   }, []);
 
-  const socialLinks = [
-    { icon: Twitter, href: '#', label: 'Twitter' },
-    { icon: Github, href: '#', label: 'GitHub' },
-    { icon: Linkedin, href: '#', label: 'LinkedIn' },
-    { icon: MessageCircle, href: '#', label: 'Discord' },
-  ];
-
   const footerLinks = [
-    { label: 'Privacy Policy', href: '#' },
-    { label: 'Terms of Service', href: '#' },
-    { label: 'Risk Disclosure', href: '#' },
-    { label: 'Contact', href: '#' },
+    { label: 'Privacy Policy', href: '/legal/privacy' },
+    { label: 'Terms of Service', href: '/legal/terms' },
+    { label: 'Risk Disclosure', href: '/legal/risk-disclosure' },
+    { label: 'Cookie Policy', href: '/legal/cookies' },
+    { label: 'Contact', href: 'mailto:contact@sentilyze.live' },
   ];
 
   return (
@@ -125,32 +106,40 @@ const Footer = () => {
             Not Investment Advice - For Informational Purposes
           </p>
 
-          {/* Social Links */}
-          <div className="flex items-center justify-center gap-4 mb-8">
-            {socialLinks.map((social) => (
-              <a
-                key={social.label}
-                href={social.href}
-                className="social-icon w-10 h-10 rounded-lg bg-[var(--graphite-blue)] flex items-center justify-center text-[var(--cool-gray)] hover:text-[var(--signal-cyan)] hover:bg-[var(--deep-slate)] transition-all hover:-translate-y-1"
-                aria-label={social.label}
-              >
-                <social.icon size={18} />
-              </a>
-            ))}
+          {/* Links */}
+          <div className="flex items-center justify-center gap-6 mb-4 flex-wrap">
+            {footerLinks.map((link) =>
+              link.href.startsWith('mailto:') ? (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  className="text-sm text-[var(--cool-gray)] hover:text-[var(--soft-white)] transition-colors relative group"
+                >
+                  {link.label}
+                  <span className="absolute -bottom-1 left-0 w-0 h-px bg-[var(--signal-cyan)] transition-all duration-300 group-hover:w-full" />
+                </a>
+              ) : (
+                <Link
+                  key={link.label}
+                  to={link.href}
+                  className="text-sm text-[var(--cool-gray)] hover:text-[var(--soft-white)] transition-colors relative group"
+                >
+                  {link.label}
+                  <span className="absolute -bottom-1 left-0 w-0 h-px bg-[var(--signal-cyan)] transition-all duration-300 group-hover:w-full" />
+                </Link>
+              )
+            )}
           </div>
 
-          {/* Links */}
-          <div className="flex items-center justify-center gap-6 mb-8 flex-wrap">
-            {footerLinks.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                className="text-sm text-[var(--cool-gray)] hover:text-[var(--soft-white)] transition-colors relative group"
-              >
-                {link.label}
-                <span className="absolute -bottom-1 left-0 w-0 h-px bg-[var(--signal-cyan)] transition-all duration-300 group-hover:w-full" />
-              </a>
-            ))}
+          {/* Cookie Settings Button */}
+          <div className="mb-8">
+            <button
+              onClick={openSettings}
+              className="text-sm text-[var(--cool-gray)] hover:text-[var(--soft-white)] transition-colors relative group"
+            >
+              Cookie Settings
+              <span className="absolute -bottom-1 left-0 w-0 h-px bg-[var(--signal-cyan)] transition-all duration-300 group-hover:w-full" />
+            </button>
           </div>
 
           {/* Copyright */}
@@ -162,7 +151,7 @@ const Footer = () => {
           </p>
 
           {/* Google Cloud Badge */}
-          <div className="mt-8 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--graphite-blue)]/50 border border-[var(--border)]">
+          <div className="mt-8 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--graphite-blue)]/50 border border-[var(--border-color)]">
             <div className="w-5 h-5 rounded bg-white flex items-center justify-center">
               <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none">
                 <path
