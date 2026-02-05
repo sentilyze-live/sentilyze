@@ -21,11 +21,11 @@ import numpy as np
 
 from sentilyze_core import get_logger
 
-from .models import ARIMAPredictor, LSTMPredictor, XGBoostPredictor
+from .ml_models import ARIMAPredictor, LSTMPredictor, XGBoostPredictor
 from .predictor import MLPredictor
 
 if TYPE_CHECKING:
-    from .models import TechnicalIndicators
+    from .ml_models import TechnicalIndicators
 
 logger = get_logger(__name__)
 
