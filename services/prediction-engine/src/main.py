@@ -6,7 +6,7 @@ import json
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
-from typing import Any, AsyncGenerator
+from typing import Any, AsyncGenerator, Optional
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
