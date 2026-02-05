@@ -12,17 +12,16 @@ const LandingPage: React.FC = () => {
           loop
           muted
           playsInline
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover brightness-[0.8]"
         >
           <source src="/background.mp4" type="video/mp4" />
         </video>
-        {/* Dark Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/80" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-black/40" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[var(--bg-primary)]/40 via-[var(--bg-primary)]/30 to-[var(--bg-primary)]/50" />
+        <div className="absolute inset-0 bg-gradient-radial from-[var(--aurora-primary)]/8 via-transparent to-transparent" />
       </div>
 
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-black/30 backdrop-blur-xl border-b border-white/10">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-[var(--bg-primary)]/70 backdrop-blur-lg border-b border-white/40">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
@@ -38,7 +37,7 @@ const LandingPage: React.FC = () => {
           <div className="flex items-center gap-4">
             <Link
               to="/app"
-              className="px-6 py-2.5 rounded-lg bg-white/10 text-white font-medium hover:bg-white/20 transition-colors border border-white/20 backdrop-blur-sm"
+              className="px-6 py-2.5 rounded-lg bg-white/15 text-white font-medium hover:bg-white/25 transition-colors border border-white/40 backdrop-blur-sm drop-shadow-lg"
             >
               Giriş Yap
             </Link>
@@ -86,7 +85,7 @@ const LandingPage: React.FC = () => {
             </div>
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-r from-blue-500/30 to-purple-500/30 rounded-3xl blur-3xl" />
-              <div className="relative bg-black/40 rounded-3xl border border-white/20 p-8 backdrop-blur-xl">
+              <div className="relative bg-[var(--bg-secondary)]/50 rounded-3xl border border-white/40 p-8 backdrop-blur-lg shadow-2xl">
                 <div className="flex items-center gap-4 mb-6">
                   <div className="flex gap-2">
                     <div className="w-3 h-3 rounded-full bg-rose-500" />
@@ -96,7 +95,7 @@ const LandingPage: React.FC = () => {
                   <span className="text-sm text-gray-300">sentilyze.live</span>
                 </div>
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-black/50 border border-white/10">
+                  <div className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-secondary)]/60 border border-white/30 backdrop-blur-md">
                     <div className="flex items-center gap-3">
                       <Coins className="w-8 h-8 text-blue-400" />
                       <div>
@@ -109,7 +108,7 @@ const LandingPage: React.FC = () => {
                       <p className="text-sm text-emerald-400">+2.34%</p>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-black/50 border border-white/10">
+                  <div className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-secondary)]/60 border border-white/30 backdrop-blur-md">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center">
                         <span className="text-white font-bold text-sm">₿</span>
@@ -139,7 +138,7 @@ const LandingPage: React.FC = () => {
             En gelişmiş yapay zeka teknolojileri ile piyasaları analiz edin, doğru zamanda doğru kararları verin.
           </p>
           <div className="grid md:grid-cols-3 gap-8">
-            <div className="bg-black/70 rounded-2xl p-8 border border-white/30 hover:border-blue-500/70 transition-all backdrop-blur-xl hover:bg-black/80 shadow-xl">
+            <div className="bg-[var(--bg-secondary)]/55 rounded-2xl p-8 border border-white/40 hover:border-[var(--aurora-primary)]/70 transition-all backdrop-blur-lg hover:bg-[var(--bg-secondary)]/70 shadow-2xl">
               <div className="w-14 h-14 rounded-xl bg-blue-500/30 flex items-center justify-center mb-6 shadow-lg">
                 <BarChart3 className="w-7 h-7 text-blue-400" />
               </div>
@@ -148,7 +147,7 @@ const LandingPage: React.FC = () => {
                 LSTM, ARIMA ve XGBoost modelleri ile altın ve kripto para fiyat tahminleri. Dakikalar içinde güncellenen veriler.
               </p>
             </div>
-            <div className="bg-black/70 rounded-2xl p-8 border border-white/30 hover:border-blue-500/70 transition-all backdrop-blur-xl hover:bg-black/80 shadow-xl">
+            <div className="bg-[var(--bg-secondary)]/55 rounded-2xl p-8 border border-white/40 hover:border-[var(--aurora-primary)]/70 transition-all backdrop-blur-lg hover:bg-[var(--bg-secondary)]/70 shadow-2xl">
               <div className="w-14 h-14 rounded-xl bg-blue-500/30 flex items-center justify-center mb-6 shadow-lg">
                 <TrendingUp className="w-7 h-7 text-blue-400" />
               </div>
@@ -157,7 +156,7 @@ const LandingPage: React.FC = () => {
                 RSI, MACD, Bollinger Bands ve daha fazlası. Profesyonel teknik analiz araçları ile piyasayı okuyun.
               </p>
             </div>
-            <div className="bg-black/70 rounded-2xl p-8 border border-white/30 hover:border-blue-500/70 transition-all backdrop-blur-xl hover:bg-black/80 shadow-xl">
+            <div className="bg-[var(--bg-secondary)]/55 rounded-2xl p-8 border border-white/40 hover:border-[var(--aurora-primary)]/70 transition-all backdrop-blur-lg hover:bg-[var(--bg-secondary)]/70 shadow-2xl">
               <div className="w-14 h-14 rounded-xl bg-blue-500/30 flex items-center justify-center mb-6 shadow-lg">
                 <Bell className="w-7 h-7 text-blue-400" />
               </div>

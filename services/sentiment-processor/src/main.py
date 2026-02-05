@@ -77,20 +77,22 @@ async def process_message(message: PubSubMessage) -> None:
 
         prediction_id = uuid4()
 
+        # Atomic check-and-set to prevent race condition
         done_key = f"processed:{raw_event.event_id}"
-        lock_key = f"lock:{raw_event.event_id}"
-        if await analyzer.cache.exists(done_key, namespace="dedup"):
-            logger.info("Duplicate delivery ignored (already processed)", event_id=str(raw_event.event_id))
-            return
+
+        # Try to atomically set the processing flag
+        # If the key already exists, this will return False
         acquired = await analyzer.cache.add(
-            lock_key,
-            {"message_id": message.message_id},
+            done_key,
+            {"message_id": message.message_id, "timestamp": datetime.utcnow().isoformat()},
             namespace="dedup",
-            ttl=10 * 60,
+            ttl=7 * 24 * 3600,  # 7 days TTL for done_key
         )
         lock_acquired = acquired
         if not acquired:
-            raise RateLimitError("Duplicate delivery in-flight", retry_after=5)
+            # Key already exists - either in-flight or already processed
+            logger.info("Duplicate delivery ignored (already processed or in-flight)", event_id=str(raw_event.event_id))
+            return
 
         if bigquery_client:
             await bigquery_client.insert_raw_event(raw_event.model_dump(mode="json"))
@@ -101,7 +103,7 @@ async def process_message(message: PubSubMessage) -> None:
                 event_id=str(raw_event.event_id),
                 source=raw_event.source.value,
             )
-            await analyzer.cache.set(done_key, "1", namespace="dedup", ttl=7 * 24 * 3600)
+            # done_key already set atomically above
             return
 
         market_type = _determine_market_type(raw_event)

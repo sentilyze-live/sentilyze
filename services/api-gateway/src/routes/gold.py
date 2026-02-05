@@ -71,21 +71,27 @@ def validate_symbol(symbol: str) -> str:
     
     symbol = symbol.upper()
     
-    # Valid gold symbols
+    # Strict whitelist of valid gold symbols (no prefix matching for security)
     valid_symbols = {
-        "XAUUSD", "XAU", "XAUEUR", "XAUGBP", "XAUTRY",
-        "XAGUSD", "XAG", "XPTUSD", "XPDUSD",
-        "GLD", "IAU", "GDX", "NUGT", "DUST",
+        # Spot gold pairs
+        "XAUUSD", "XAU", "XAUEUR", "XAUGBP", "XAUTRY", "XAUJPY",
+        "XAUCHF", "XAUCAD", "XAUAUD", "XAUNZD",
+        # Silver
+        "XAGUSD", "XAG", "XAGEUR", "XAGGBP",
+        # Platinum & Palladium
+        "XPTUSD", "XPTEUR", "XPDUSD", "XPDEUR",
+        # ETFs
+        "GLD", "IAU", "GDX", "GDXJ", "NUGT", "DUST", "JNUG", "JDST",
+        # Turkish gram gold
+        "XAUTRY",
     }
-    
+
     if symbol not in valid_symbols:
-        # Allow any XAU-prefixed symbol
-        if not symbol.startswith(("XAU", "XAG", "GLD")):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid symbol: {symbol}. Supported: XAUUSD, XAUEUR, XAGUSD, GLD, IAU",
-            )
-    
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid symbol: {symbol}. Supported symbols: XAUUSD, XAUEUR, XAUGBP, XAUTRY, XAGUSD, GLD, IAU, and others. See API documentation.",
+        )
+
     return symbol
 
 

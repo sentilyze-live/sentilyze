@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { goldApi, type GoldPrice, type GoldHistory, type Prediction, type TechnicalIndicator, type SentimentData, type SpikeAnalysis, type Correlation } from '../lib/api/gold';
+import { goldApi, type GoldPrice, type GoldHistory, type Prediction, type TechnicalIndicator, type SentimentData, type SpikeAnalysis, type Correlation, type ScenarioData, type DailyReportData, type MarketContextData, type CorrelationDetail } from '../lib/api/gold';
 
 interface GoldState {
   // Data
@@ -11,6 +11,10 @@ interface GoldState {
   sentiment: SentimentData | null;
   spikes: SpikeAnalysis | null;
   correlations: Correlation[];
+  scenarios: ScenarioData | null;
+  dailyReport: DailyReportData | null;
+  context: MarketContextData | null;
+  correlationDetails: Record<string, CorrelationDetail> | null;
 
   // Loading states
   isLoadingPrice: boolean;
@@ -20,6 +24,10 @@ interface GoldState {
   isLoadingSentiment: boolean;
   isLoadingSpikes: boolean;
   isLoadingCorrelations: boolean;
+  isLoadingScenarios: boolean;
+  isLoadingDailyReport: boolean;
+  isLoadingContext: boolean;
+  isLoadingCorrelationDetails: boolean;
 
   // Errors
   errorPrice: string | null;
@@ -29,6 +37,10 @@ interface GoldState {
   errorSentiment: string | null;
   errorSpikes: string | null;
   errorCorrelations: string | null;
+  errorScenarios: string | null;
+  errorDailyReport: string | null;
+  errorContext: string | null;
+  errorCorrelationDetails: string | null;
 
   // Timeframe
   timeframe: string;
@@ -43,6 +55,10 @@ interface GoldState {
   fetchSentiment: () => Promise<void>;
   fetchSpikes: (threshold?: number) => Promise<void>;
   fetchCorrelations: () => Promise<void>;
+  fetchScenarios: () => Promise<void>;
+  fetchDailyReport: () => Promise<void>;
+  fetchContext: () => Promise<void>;
+  fetchCorrelationDetails: (compareWith?: string[], days?: number) => Promise<void>;
   fetchAll: () => Promise<void>;
   updatePrice: (price: GoldPrice) => void;
   clearErrors: () => void;
@@ -57,6 +73,10 @@ export const useGoldStore = create<GoldState>((set, get) => ({
   sentiment: null,
   spikes: null,
   correlations: [],
+  scenarios: null,
+  dailyReport: null,
+  context: null,
+  correlationDetails: null,
 
   isLoadingPrice: false,
   isLoadingHistory: false,
@@ -65,6 +85,10 @@ export const useGoldStore = create<GoldState>((set, get) => ({
   isLoadingSentiment: false,
   isLoadingSpikes: false,
   isLoadingCorrelations: false,
+  isLoadingScenarios: false,
+  isLoadingDailyReport: false,
+  isLoadingContext: false,
+  isLoadingCorrelationDetails: false,
 
   errorPrice: null,
   errorHistory: null,
@@ -73,6 +97,10 @@ export const useGoldStore = create<GoldState>((set, get) => ({
   errorSentiment: null,
   errorSpikes: null,
   errorCorrelations: null,
+  errorScenarios: null,
+  errorDailyReport: null,
+  errorContext: null,
+  errorCorrelationDetails: null,
 
   timeframe: '1h',
 
@@ -119,7 +147,9 @@ export const useGoldStore = create<GoldState>((set, get) => ({
     const { currentSymbol, timeframe } = get();
     set({ isLoadingPredictions: true, errorPredictions: null });
     try {
-      const predictions = await goldApi.getPredictions(currentSymbol, timeframe);
+      const response = await goldApi.getPredictions(currentSymbol, timeframe);
+      // Extract predictions array from response
+      const predictions = response.predictions || [];
       set({ predictions, isLoadingPredictions: false });
     } catch (error) {
       set({
@@ -185,6 +215,61 @@ export const useGoldStore = create<GoldState>((set, get) => ({
     }
   },
 
+  fetchScenarios: async () => {
+    const { currentSymbol } = get();
+    set({ isLoadingScenarios: true, errorScenarios: null });
+    try {
+      const scenarios = await goldApi.getScenarios(currentSymbol);
+      set({ scenarios, isLoadingScenarios: false });
+    } catch (error) {
+      set({
+        errorScenarios: error instanceof Error ? error.message : 'Senaryo verileri alınamadı',
+        isLoadingScenarios: false,
+      });
+    }
+  },
+
+  fetchDailyReport: async () => {
+    set({ isLoadingDailyReport: true, errorDailyReport: null });
+    try {
+      const dailyReport = await goldApi.getDailyReport();
+      set({ dailyReport, isLoadingDailyReport: false });
+    } catch (error) {
+      set({
+        errorDailyReport: error instanceof Error ? error.message : 'Günlük rapor alınamadı',
+        isLoadingDailyReport: false,
+      });
+    }
+  },
+
+  fetchContext: async () => {
+    const { currentSymbol } = get();
+    set({ isLoadingContext: true, errorContext: null });
+    try {
+      const context = await goldApi.getContext(currentSymbol);
+      set({ context, isLoadingContext: false });
+    } catch (error) {
+      set({
+        errorContext: error instanceof Error ? error.message : 'Piyasa bağlamı alınamadı',
+        isLoadingContext: false,
+      });
+    }
+  },
+
+  fetchCorrelationDetails: async (compareWith = ['DXY', 'SPX', 'US10Y'], days = 30) => {
+    const { currentSymbol } = get();
+    set({ isLoadingCorrelationDetails: true, errorCorrelationDetails: null });
+    try {
+      const correlationDetails = await goldApi.getCorrelation(currentSymbol, compareWith, days);
+      set({ correlationDetails, isLoadingCorrelationDetails: false });
+    } catch (error) {
+      set({
+        errorCorrelationDetails: error instanceof Error ? error.message : 'Korelasyon detayları alınamadı',
+        isLoadingCorrelationDetails: false,
+      });
+    }
+  },
+
   fetchAll: async () => {
     await Promise.all([
       get().fetchPrice(),
@@ -194,6 +279,10 @@ export const useGoldStore = create<GoldState>((set, get) => ({
       get().fetchSentiment(),
       get().fetchSpikes(),
       get().fetchCorrelations(),
+      get().fetchScenarios(),
+      get().fetchDailyReport(),
+      get().fetchContext(),
+      get().fetchCorrelationDetails(),
     ]);
   },
 
@@ -208,6 +297,10 @@ export const useGoldStore = create<GoldState>((set, get) => ({
       errorSentiment: null,
       errorSpikes: null,
       errorCorrelations: null,
+      errorScenarios: null,
+      errorDailyReport: null,
+      errorContext: null,
+      errorCorrelationDetails: null,
     }),
 }));
 
@@ -219,6 +312,10 @@ export const useTechnicalIndicators = () => useGoldStore((state) => state.indica
 export const useSentiment = () => useGoldStore((state) => state.sentiment);
 export const useSpikes = () => useGoldStore((state) => state.spikes);
 export const useCorrelations = () => useGoldStore((state) => state.correlations);
+export const useScenarios = () => useGoldStore((state) => state.scenarios);
+export const useDailyReport = () => useGoldStore((state) => state.dailyReport);
+export const useMarketContext = () => useGoldStore((state) => state.context);
+export const useCorrelationDetails = () => useGoldStore((state) => state.correlationDetails);
 export const useGoldLoading = () => useGoldStore((state) => ({
   price: state.isLoadingPrice,
   history: state.isLoadingHistory,
@@ -227,4 +324,8 @@ export const useGoldLoading = () => useGoldStore((state) => ({
   sentiment: state.isLoadingSentiment,
   spikes: state.isLoadingSpikes,
   correlations: state.isLoadingCorrelations,
+  scenarios: state.isLoadingScenarios,
+  dailyReport: state.isLoadingDailyReport,
+  context: state.isLoadingContext,
+  correlationDetails: state.isLoadingCorrelationDetails,
 }));

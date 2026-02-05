@@ -37,20 +37,27 @@ def validate_symbol(symbol: str) -> str:
     
     symbol = symbol.upper().strip()
     
-    # Valid crypto symbols (common ones)
+    # Strict whitelist of valid crypto symbols
     valid_symbols = {
-        "BTC", "ETH", "SOL", "ADA", "DOT", "LINK",
-        "MATIC", "UNI", "AAVE", "COMP", "MKR", "YFI",
-        "SNX", "CRV", "SUSHI", "1INCH", "LDO", "RPL",
-        "FET", "RNDR", "GRT", "OCEAN", "AGIX", "ALI",
+        # Major crypto
+        "BTC", "ETH", "BNB", "XRP", "ADA", "DOGE", "SOL", "TRX", "DOT", "MATIC",
+        # DeFi
+        "UNI", "AAVE", "COMP", "MKR", "YFI", "SNX", "CRV", "SUSHI", "1INCH",
+        "LDO", "RPL", "BAL", "ALCX", "FXS",
+        # Layer 2 & Scaling
+        "LINK", "ATOM", "AVAX", "NEAR", "FTM", "ALGO", "HBAR", "VET", "ICP",
+        # AI & Data
+        "FET", "RNDR", "GRT", "OCEAN", "AGIX", "ALI", "NMR",
+        # Meme
+        "SHIB", "PEPE", "FLOKI",
     }
-    
-    if symbol not in valid_symbols and not symbol.isalpha():
+
+    if symbol not in valid_symbols:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid symbol: {symbol}",
+            detail=f"Invalid symbol: {symbol}. Supported: BTC, ETH, SOL, ADA, and 40+ others. See API documentation.",
         )
-    
+
     return symbol
 
 
