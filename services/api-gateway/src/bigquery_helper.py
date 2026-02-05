@@ -383,6 +383,81 @@ class BigQueryHelper:
             logger.error("BigQuery market context query failed", error=str(e))
             raise
 
+    async def get_gold_price_data(
+        self,
+        symbol: str,
+        include_history: bool = False,
+    ) -> Optional[dict[str, Any]]:
+        """Get gold price data from BigQuery with optional history."""
+        try:
+            table = f"{self.client.project_id}.{self.client.dataset}.raw_events"
+
+            # Get latest price
+            query = f"""
+                SELECT
+                    symbol,
+                    JSON_VALUE(payload, '$.price') as price,
+                    JSON_VALUE(payload, '$.currency') as currency,
+                    JSON_VALUE(payload, '$.change') as change,
+                    JSON_VALUE(payload, '$.change_percent') as change_percent,
+                    timestamp
+                FROM `{table}`
+                WHERE symbol = @symbol
+                AND event_type = 'gold_price'
+                ORDER BY timestamp DESC
+                LIMIT 1
+            """
+
+            params = [bigquery.ScalarQueryParameter("symbol", "STRING", symbol)]
+            job_config = bigquery.QueryJobConfig(query_parameters=params)
+            results = await self.client.execute_query(query, job_config=job_config)
+
+            result_list = list(results)
+            if not result_list:
+                return None
+
+            row = result_list[0]
+            price_data = {
+                "symbol": row.symbol,
+                "price": float(row.price) if row.price else 0.0,
+                "currency": row.currency or "USD",
+                "change": float(row.change) if row.change else 0.0,
+                "change_percent": float(row.change_percent) if row.change_percent else 0.0,
+                "timestamp": row.timestamp.isoformat() if hasattr(row.timestamp, 'isoformat') else str(row.timestamp),
+            }
+
+            if include_history:
+                # Get historical prices (last 30 days)
+                history_query = f"""
+                    SELECT
+                        JSON_VALUE(payload, '$.price') as price,
+                        timestamp
+                    FROM `{table}`
+                    WHERE symbol = @symbol
+                    AND event_type = 'gold_price'
+                    AND timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+                    ORDER BY timestamp DESC
+                    LIMIT 100
+                """
+
+                history_results = await self.client.execute_query(history_query, job_config=job_config)
+
+                history = []
+                for hist_row in history_results:
+                    if hist_row.price:
+                        history.append({
+                            "price": float(hist_row.price),
+                            "timestamp": hist_row.timestamp.isoformat() if hasattr(hist_row.timestamp, 'isoformat') else str(hist_row.timestamp),
+                        })
+
+                price_data["history"] = history
+
+            return price_data
+
+        except Exception as e:
+            logger.error("BigQuery gold price query failed", symbol=symbol, error=str(e))
+            return None
+
 
 _bq_helper_instance: Optional[BigQueryHelper] = None
 
