@@ -1031,12 +1031,34 @@ async def get_prediction_scenarios(
 
         if not ensemble or not settings.enable_ensemble_predictions:
             logger.warning("Ensemble predictor not available, using fallback for all timeframes")
-            # Return all 3 timeframes using fallback scenarios
-            return [
+            # Create fallback scenarios for all 3 timeframes
+            fallback_scenarios = [
                 create_fallback_scenario("1 Saat", current_price, sentiment_score),
                 create_fallback_scenario("2 Saat", current_price, sentiment_score),
                 create_fallback_scenario("3 Saat", current_price, sentiment_score),
             ]
+
+            # Group by timeframe
+            scenarios_by_timeframe = {
+                '1h': [fallback_scenarios[0]],
+                '2h': [fallback_scenarios[1]],
+                '3h': [fallback_scenarios[2]]
+            }
+
+            # Calculate ensemble metrics
+            ensemble_prediction = sum(s.get('price', 0) for s in fallback_scenarios) / len(fallback_scenarios)
+            ensemble_confidence = sum(s.get('confidenceScore', 0) for s in fallback_scenarios) / len(fallback_scenarios)
+
+            # Return structured response
+            return {
+                "data": {
+                    "symbol": symbol,
+                    "ensemble_prediction": round(ensemble_prediction, 2),
+                    "ensemble_confidence": round(ensemble_confidence, 2),
+                    "scenarios": scenarios_by_timeframe,
+                },
+                "timestamp": datetime.utcnow().isoformat()
+            }
 
         # Fetch data for predictions
         from services.prediction_engine.src.predictor import EconomicDataFetcher
