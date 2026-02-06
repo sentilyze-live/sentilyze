@@ -248,10 +248,11 @@ class GoldSentimentAnalyzer(BaseSentimentAnalyzer):
     """
 
     def __init__(self, prompt_template: str | None = None) -> None:
-        super().__init__(prompt_template)
+        # Initialize attributes that are accessed by properties BEFORE calling super().__init__()
+        self._language: str = "en"  # Default to English
         self._market_type = "gold"
         self._cot_report: CotReport | None = None
-        self._language: str = "en"  # Default to English
+        super().__init__(prompt_template)
 
     @property
     def _prompt_file_name(self) -> str:
