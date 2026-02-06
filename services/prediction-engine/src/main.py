@@ -620,6 +620,163 @@ async def get_optimized_weights():
     return feedback_loop.get_current_weights()
 
 
+@app.get("/feedback/daily-report", tags=["feedback"])
+async def get_daily_report(date: Optional[str] = None):
+    """Generate daily prediction report with success/failure analysis.
+
+    Shows what went right, what went wrong, and why.
+    Includes actionable lessons for improvement.
+
+    Args:
+        date: Date in YYYY-MM-DD format (defaults to today)
+    """
+    if not feedback_loop:
+        return {"status": "not_initialized"}
+
+    report_date = None
+    if date:
+        try:
+            report_date = datetime.strptime(date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid date format. Use YYYY-MM-DD",
+            )
+
+    return await feedback_loop.generate_daily_report(report_date)
+
+
+@app.post("/feedback/apply-lessons", tags=["feedback"])
+async def apply_daily_lessons(req: Request):
+    """Apply lessons from daily report to improve future predictions.
+
+    Automatically adjusts component and indicator weights based on
+    performance analysis. Only applies high-severity lessons.
+    """
+    api_key = req.headers.get("X-Admin-API-Key") or req.headers.get("x-admin-api-key")
+    admin_key = os.getenv("ADMIN_API_KEY", "")
+    if not admin_key or api_key != admin_key:
+        raise HTTPException(status_code=403, detail="Admin API key required")
+
+    if not feedback_loop:
+        raise HTTPException(status_code=503, detail="Feedback loop not initialized")
+
+    # First generate today's report
+    report = await feedback_loop.generate_daily_report()
+    lessons = report.get("lessons_learned", [])
+
+    if not lessons:
+        return {"status": "no_lessons", "message": "No lessons to apply today"}
+
+    # Apply the lessons
+    result = await feedback_loop.apply_lessons(lessons)
+
+    return {
+        "status": "applied",
+        "report_date": report["date"],
+        "accuracy": report["summary"]["accuracy_pct"],
+        **result,
+    }
+
+
+@app.post("/feedback/end-of-day", tags=["feedback"])
+async def end_of_day_cycle(req: Request):
+    """Run the complete end-of-day cycle.
+
+    1. Resolve all expired predictions
+    2. Generate daily report
+    3. Apply high-severity lessons
+    4. Trigger weight re-optimization if needed
+
+    This endpoint should be called by Cloud Scheduler at 23:55 UTC daily.
+    """
+    api_key = req.headers.get("X-Admin-API-Key") or req.headers.get("x-admin-api-key")
+    admin_key = os.getenv("ADMIN_API_KEY", "")
+    if not admin_key or api_key != admin_key:
+        raise HTTPException(status_code=403, detail="Admin API key required")
+
+    if not feedback_loop:
+        raise HTTPException(status_code=503, detail="Feedback loop not initialized")
+
+    results = {}
+
+    # Step 1: Resolve expired predictions
+    resolved = await feedback_loop.check_and_resolve_expired()
+    results["resolved_predictions"] = resolved
+
+    # Step 2: Generate daily report
+    report = await feedback_loop.generate_daily_report()
+    results["report"] = {
+        "date": report.get("date"),
+        "accuracy": report.get("summary", {}).get("accuracy_pct", "N/A"),
+        "total": report.get("summary", {}).get("total_predictions", 0),
+        "lessons_count": len(report.get("lessons_learned", [])),
+        "top_failures": report.get("top_failure_reasons", [])[:5],
+    }
+
+    # Step 3: Apply lessons
+    lessons = report.get("lessons_learned", [])
+    if lessons:
+        applied = await feedback_loop.apply_lessons(lessons)
+        results["lessons_applied"] = applied
+
+    # Step 4: Re-optimize weights if enough data
+    try:
+        # Get recent prices for regime detection
+        if bigquery_client:
+            prices = await _get_recent_prices()
+            if prices and len(prices) >= 20:
+                optimized = await feedback_loop.maybe_optimize_weights(
+                    prices=prices, symbol="XAU"
+                )
+                if optimized:
+                    results["weight_optimization"] = {
+                        "status": "optimized",
+                        "new_weights": optimized.component_weights,
+                        "regime": optimized.market_regime,
+                        "confidence": f"{optimized.optimization_confidence:.0%}",
+                    }
+                else:
+                    results["weight_optimization"] = {"status": "not_needed"}
+    except Exception as e:
+        results["weight_optimization"] = {"status": "error", "error": str(e)}
+
+    logger.info("End-of-day cycle completed", results=results)
+    return results
+
+
+async def _get_recent_prices() -> list[float]:
+    """Fetch recent gold prices from BigQuery for weight optimization."""
+    if not bigquery_client:
+        return []
+
+    try:
+        from google.cloud import bigquery as bq
+
+        client = bq.Client(project=settings.google_cloud_project)
+        query = """
+        SELECT CAST(JSON_EXTRACT_SCALAR(payload, '$.price') AS FLOAT64) as price
+        FROM `{project}.{dataset}.raw_events`
+        WHERE symbol LIKE '%XAU%'
+          AND JSON_EXTRACT_SCALAR(payload, '$.price') IS NOT NULL
+          AND timestamp > TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)
+        ORDER BY timestamp DESC
+        LIMIT 200
+        """.format(
+            project=settings.google_cloud_project,
+            dataset=settings.bigquery_dataset,
+        )
+
+        rows = client.query(query).result()
+        prices = [float(row.price) for row in rows if row.price]
+        prices.reverse()  # oldest first
+        return prices
+
+    except Exception as e:
+        logger.warning("Could not fetch recent prices", error=str(e))
+        return []
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     """Global exception handler."""
