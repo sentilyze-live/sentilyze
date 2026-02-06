@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { gsap } from 'gsap';
-import { ArrowRight, TrendingUp, ChevronDown, Sparkles } from 'lucide-react';
+import { ArrowRight, TrendingUp, ChevronDown, Sparkles, Shield } from 'lucide-react';
+import { useIsMobile } from '../hooks/use-mobile';
 
 const Hero = () => {
   const heroRef = useRef<HTMLDivElement>(null);
   const headlineRef = useRef<HTMLHeadingElement>(null);
+  const isMobile = useIsMobile();
 
   // GSAP entrance animations
   useEffect(() => {
@@ -55,18 +57,22 @@ const Hero = () => {
       ref={heroRef}
       className="relative min-h-screen flex flex-col overflow-hidden bg-[var(--bg-primary)]"
     >
-      {/* Video Background */}
+      {/* Video Background - skip on mobile for performance */}
       <div className="absolute inset-0 z-0">
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="w-full h-full object-cover opacity-80"
-        >
-          <source src="/aurora-background.mp4" type="video/mp4" />
-        </video>
-        {/* Dark Overlay with Aurora accent - Reduced for brighter video */}
+        {!isMobile ? (
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="w-full h-full object-cover brightness-[0.8]"
+          >
+            <source src="/aurora-background.mp4" type="video/mp4" />
+          </video>
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-[#0A0E13] via-[#121822] to-[#0A0E13]" />
+        )}
+        {/* Dark Overlay with Aurora accent */}
         <div className="absolute inset-0 bg-gradient-to-b from-[#0A0E13]/60 via-[#0A0E13]/50 to-[#0A0E13]/70" />
         {/* Aurora glow effect */}
         <div className="absolute inset-0 bg-gradient-radial from-[var(--aurora-primary)]/5 via-transparent to-transparent" />
@@ -97,34 +103,39 @@ const Hero = () => {
             style={{ perspective: '1000px' }}
           >
             <span className="hero-headline-line block text-[var(--text-primary)] drop-shadow-2xl">
-              Read Market
+              Make Smarter Market
             </span>
             <span className="hero-headline-line block bg-gradient-to-r from-[var(--aurora-cyan)] via-[var(--aurora-primary)] to-[var(--aurora-purple)] bg-clip-text text-transparent mt-2 drop-shadow-2xl animate-gradient">
-              Sentiment with AI
+              Decisions with AI
             </span>
           </h1>
 
           {/* Subheadline */}
           <p className="hero-subheadline text-lg sm:text-xl text-[var(--text-secondary)] max-w-2xl mx-auto mb-10 leading-relaxed">
-            Real-time sentiment analysis and price predictions for cryptocurrency and gold markets.
-            Powered by Google Cloud&apos;s Vertex AI.
+            Track sentiment across 20+ sources. Get ensemble ML predictions for gold and crypto.
+            Know market mood before price moves.
           </p>
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
             <a
               href="/app"
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.gtag) {
+                  window.gtag('event', 'cta_click', { event_category: 'engagement', event_label: 'hero_open_dashboard' });
+                }
+              }}
               className="hero-cta-primary group flex items-center gap-2 px-8 py-4 rounded-xl font-semibold bg-gradient-to-r from-[var(--gold-primary)] to-[var(--gold-soft)] hover:from-[var(--gold-hover)] hover:to-[var(--gold-primary)] transition-all duration-300 shadow-lg hover:shadow-2xl hover:shadow-[var(--gold-primary)]/50 hover:scale-105 text-[var(--bg-primary)]"
             >
               <TrendingUp size={20} />
-              <span>Start Analysis</span>
+              <span>Open Dashboard</span>
               <ArrowRight size={18} className="ml-1 group-hover:translate-x-1 transition-transform" />
             </a>
             <a
-              href="#gold-analysis"
+              href="#how-it-works"
               className="hero-cta-secondary flex items-center gap-2 px-8 py-4 rounded-xl font-semibold text-[var(--text-primary)] border border-[var(--border-color)] bg-[var(--bg-secondary)]/50 backdrop-blur-md hover:bg-[var(--bg-secondary)] hover:border-[var(--gold-primary)]/50 transition-all duration-300"
             >
-              <span>Explore Features</span>
+              <span>See How It Works</span>
             </a>
           </div>
 
@@ -132,10 +143,18 @@ const Hero = () => {
           <div className="grid grid-cols-3 gap-4 sm:gap-8 max-w-3xl mx-auto mb-10">
             <div className="hero-trust-badge bg-[var(--bg-secondary)]/50 backdrop-blur-md border border-[var(--border-color)] rounded-xl p-4">
               <div className="text-2xl sm:text-3xl font-bold text-[var(--gold-primary)] mb-1">
-                99.2%
+                20+
               </div>
               <div className="text-xs sm:text-sm text-[var(--text-muted)]">
-                API Uptime
+                Data Sources
+              </div>
+            </div>
+            <div className="hero-trust-badge bg-[var(--bg-secondary)]/50 backdrop-blur-md border border-[var(--border-color)] rounded-xl p-4">
+              <div className="text-2xl sm:text-3xl font-bold text-[var(--gold-primary)] mb-1">
+                4
+              </div>
+              <div className="text-xs sm:text-sm text-[var(--text-muted)]">
+                ML Models
               </div>
             </div>
             <div className="hero-trust-badge bg-[var(--bg-secondary)]/50 backdrop-blur-md border border-[var(--border-color)] rounded-xl p-4">
@@ -143,15 +162,7 @@ const Hero = () => {
                 24/7
               </div>
               <div className="text-xs sm:text-sm text-[var(--text-muted)]">
-                Live Analysis
-              </div>
-            </div>
-            <div className="hero-trust-badge bg-[var(--bg-secondary)]/50 backdrop-blur-md border border-[var(--border-color)] rounded-xl p-4">
-              <div className="text-2xl sm:text-3xl font-bold text-[var(--gold-primary)] mb-1">
-                AI
-              </div>
-              <div className="text-xs sm:text-sm text-[var(--text-muted)]">
-                Powered
+                Real-time Alerts
               </div>
             </div>
           </div>
@@ -172,6 +183,19 @@ const Hero = () => {
                 Google Cloud Startup Program
               </p>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Legal Disclaimer Banner - Must be visible on landing */}
+      <div className="absolute bottom-20 left-1/2 -translate-x-1/2 max-w-4xl w-full px-4 z-10">
+        <div className="bg-amber-900/40 backdrop-blur-md border border-amber-500/30 rounded-lg p-3">
+          <div className="flex items-center gap-2">
+            <Shield className="w-4 h-4 text-amber-400 flex-shrink-0" />
+            <p className="text-[10px] text-amber-300/80 leading-relaxed">
+              <strong>Yasal Uyarı:</strong> Sentilyze yatırım tavsiyesi vermez.
+              Sunulan veriler bilgilendirme amaçlıdır. SPK mevzuatı kapsamında yatırım danışmanlığı yetkimiz yoktur.
+            </p>
           </div>
         </div>
       </div>
