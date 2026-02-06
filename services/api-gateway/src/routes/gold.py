@@ -939,7 +939,7 @@ async def get_gold_predictions(
 async def get_prediction_scenarios(
     symbol: str = Query(default="XAUTRY", description="Gold symbol for scenarios"),
     user: dict = Depends(get_optional_user),
-) -> list[dict[str, Any]]:
+) -> dict[str, Any]:
     """Get real prediction scenarios using ensemble of ML models.
 
     Uses real LSTM, ARIMA, XGBoost, and Random Forest models (not mock data).
