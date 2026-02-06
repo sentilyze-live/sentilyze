@@ -75,11 +75,15 @@ class ResponseTransformerMiddleware(BaseHTTPMiddleware):
             transformed = transform_dict_keys(data)
             new_body = json.dumps(transformed, ensure_ascii=False).encode()
 
+            # Update headers with correct Content-Length
+            headers = dict(response.headers)
+            headers["content-length"] = str(len(new_body))
+
             # Create new response with transformed body
             return Response(
                 content=new_body,
                 status_code=response.status_code,
-                headers=dict(response.headers),
+                headers=headers,
                 media_type=response.media_type
             )
 
@@ -90,10 +94,12 @@ class ResponseTransformerMiddleware(BaseHTTPMiddleware):
                 error=str(e),
                 path=request.url.path
             )
+            headers = dict(response.headers)
+            headers["content-length"] = str(len(body))
             return Response(
                 content=body,
                 status_code=response.status_code,
-                headers=dict(response.headers),
+                headers=headers,
                 media_type=response.media_type
             )
         except Exception as e:
@@ -103,9 +109,11 @@ class ResponseTransformerMiddleware(BaseHTTPMiddleware):
                 error=str(e),
                 path=request.url.path
             )
+            headers = dict(response.headers)
+            headers["content-length"] = str(len(body))
             return Response(
                 content=body,
                 status_code=response.status_code,
-                headers=dict(response.headers),
+                headers=headers,
                 media_type=response.media_type
             )
