@@ -99,7 +99,6 @@ const BlogPost = () => {
         {/* JSON-LD Schema */}
         <script type="application/ld+json">{JSON.stringify(schemaData)}</script>
       </Helmet>
-      </Helmet>
 
       {/* Back Button */}
       <div className="border-b border-[var(--border-color)]">
