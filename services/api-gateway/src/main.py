@@ -138,6 +138,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Add response transformer middleware (snake_case → camelCase)
+from .middleware import ResponseTransformerMiddleware
+app.add_middleware(ResponseTransformerMiddleware, enable_transformation=True)
+
 # Rate limiting middleware
 @app.middleware("http")
 async def rate_limit(request, call_next):

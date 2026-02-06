@@ -13,7 +13,7 @@ Cost comparison (monthly):
 """
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from google.cloud import firestore
@@ -55,7 +55,7 @@ class FirestoreCacheClient:
             
             # Check TTL
             expires_at = data.get("expires_at")
-            if expires_at and expires_at < datetime.utcnow():
+            if expires_at and expires_at < datetime.now(timezone.utc):
                 await asyncio.to_thread(doc_ref.delete)
                 return None
             
@@ -78,11 +78,11 @@ class FirestoreCacheClient:
         try:
             doc_ref = self.client.collection(self._collection).document(f"{namespace}:{key}")
             
-            expires_at = datetime.utcnow() + timedelta(seconds=ttl)
+            expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl)
             
             data = {
                 "value": value,
-                "created_at": datetime.utcnow(),
+                "created_at": datetime.now(timezone.utc),
                 "expires_at": expires_at,
                 "ttl_seconds": ttl,
             }
@@ -143,12 +143,12 @@ class FirestoreCacheClient:
             doc = await asyncio.to_thread(doc_ref.get)
             
             if not doc.exists:
-                expires_at = datetime.utcnow() + timedelta(seconds=ttl_seconds)
+                expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)
                 await asyncio.to_thread(
                     doc_ref.set,
                     {
                         "value": amount,
-                        "created_at": datetime.utcnow(),
+                        "created_at": datetime.now(timezone.utc),
                         "expires_at": expires_at,
                     }
                 )
@@ -171,23 +171,70 @@ class FirestoreCacheClient:
         try:
             doc_ref = self.client.collection(self._collection).document(f"{namespace}:{key}")
             doc = await asyncio.to_thread(doc_ref.get)
-            
+
             if not doc.exists:
                 return 0
-            
+
             data = doc.to_dict()
             expires_at = data.get("expires_at")
-            
+
             if not expires_at:
                 return 0
-            
-            remaining = (expires_at - datetime.utcnow()).total_seconds()
+
+            remaining = (expires_at - datetime.now(timezone.utc)).total_seconds()
             return max(0, int(remaining))
-            
+
         except Exception as e:
             logger.error("Firestore TTL check failed", error=str(e), key=key)
             raise CacheError(f"Failed to check TTL: {e}", details={"key": key, "namespace": namespace}) from e
-    
+
+    async def add(
+        self,
+        key: str,
+        value: Any,
+        ttl: int = 3600,
+        namespace: str = "default"
+    ) -> bool:
+        """Atomic set-if-not-exists operation (for deduplication/locking).
+
+        Returns True if key was set (didn't exist), False if key already exists.
+        Uses Firestore transaction for atomicity.
+        """
+        try:
+            doc_ref = self.client.collection(self._collection).document(f"{namespace}:{key}")
+
+            @firestore.transactional
+            def _add_transaction(transaction, ref):
+                snapshot = ref.get(transaction=transaction)
+
+                # Check if exists and not expired
+                if snapshot.exists:
+                    data = snapshot.to_dict()
+                    expires_at = data.get("expires_at")
+
+                    # If not expired, return False (key exists)
+                    if not expires_at or expires_at > datetime.now(timezone.utc):
+                        return False
+
+                # Key doesn't exist or expired - set it
+                expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl)
+                transaction.set(ref, {
+                    "value": value,
+                    "created_at": datetime.now(timezone.utc),
+                    "expires_at": expires_at,
+                    "ttl_seconds": ttl,
+                })
+                return True
+
+            # Run transaction
+            transaction = self.client.transaction()
+            result = await asyncio.to_thread(_add_transaction, transaction, doc_ref)
+            return result
+
+        except Exception as e:
+            logger.error("Firestore cache add failed", error=str(e), key=key)
+            raise CacheError(f"Failed to add cache value: {e}", details={"key": key, "namespace": namespace}) from e
+
     async def close(self) -> None:
         """Close Firestore client (no-op for Firestore)."""
         pass

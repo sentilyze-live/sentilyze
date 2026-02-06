@@ -2,5 +2,6 @@
 
 from .auth import auth_middleware_handler
 from .rate_limit import rate_limit_middleware
+from .response_transformer import ResponseTransformerMiddleware
 
-__all__ = ["auth_middleware_handler", "rate_limit_middleware"]
+__all__ = ["auth_middleware_handler", "rate_limit_middleware", "ResponseTransformerMiddleware"]

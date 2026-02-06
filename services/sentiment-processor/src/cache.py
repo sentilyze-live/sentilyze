@@ -118,17 +118,73 @@ class SentimentCache:
             logger.warning(f"Cache exists check failed: {e}")
             return False
 
-    async def delete(self, cache_key: str) -> bool:
+    async def add(
+        self,
+        cache_key: str,
+        value: Any,
+        ttl: int | None = None,
+        namespace: str | None = None,
+    ) -> bool:
+        """Atomic set-if-not-exists operation (for deduplication/locking).
+
+        Args:
+            cache_key: The cache key to add
+            value: Value to store
+            ttl: Time-to-live in seconds (uses default if None)
+            namespace: Optional namespace override (uses self._namespace if None)
+
+        Returns:
+            True if key was set (didn't exist), False if key already exists
+        """
+        try:
+            ttl_seconds = ttl or settings.sentiment_cache_ttl
+            ns = namespace or self._namespace
+            return await self.cache.add(cache_key, value, ttl=ttl_seconds, namespace=ns)
+        except Exception as e:
+            logger.warning(f"Cache add failed: {e}")
+            return False
+
+    async def set(
+        self,
+        cache_key: str,
+        value: Any,
+        ttl: int | None = None,
+        namespace: str | None = None,
+    ) -> bool:
+        """Set a cache value (generic interface for compatibility).
+
+        Args:
+            cache_key: The cache key to store under
+            value: Value to store
+            ttl: Time-to-live in seconds (uses default if None)
+            namespace: Optional namespace override (uses self._namespace if None)
+
+        Returns:
+            True if cached successfully, False otherwise
+        """
+        try:
+            ttl_seconds = ttl or settings.sentiment_cache_ttl
+            ns = namespace or self._namespace
+            await self.cache.set(cache_key, value, ttl=ttl_seconds, namespace=ns)
+            logger.debug(f"Set cache for key: {cache_key}, ttl={ttl_seconds}s, namespace={ns}")
+            return True
+        except Exception as e:
+            logger.warning(f"Cache set failed: {e}")
+            return False
+
+    async def delete(self, cache_key: str, namespace: str | None = None) -> bool:
         """Delete a cached result.
 
         Args:
             cache_key: The cache key to delete
+            namespace: Optional namespace override (uses self._namespace if None)
 
         Returns:
             True if deleted successfully, False otherwise
         """
         try:
-            await self.cache.delete(cache_key, namespace=self._namespace)
+            ns = namespace or self._namespace
+            await self.cache.delete(cache_key, namespace=ns)
             return True
         except Exception as e:
             logger.warning(f"Cache delete failed: {e}")

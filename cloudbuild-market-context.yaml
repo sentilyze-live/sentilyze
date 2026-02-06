@@ -1,0 +1,73 @@
+steps:
+  # Build the market context processor container
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '-t', '${_IMAGE_NAME}',
+      '-f', 'services/market-context-processor/Dockerfile',
+      '.'
+    ]
+
+  # Push the image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'push',
+      '${_IMAGE_NAME}'
+    ]
+
+  # Deploy to Cloud Run with Secret Manager integration
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'market-context-processor'
+      - '--image'
+      - '${_IMAGE_NAME}'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--service-account'
+      - 'sentilyze-market-context@${_PROJECT_ID}.iam.gserviceaccount.com'
+      - '--set-secrets'
+      - 'GOLDAPI_API_KEY=GOLDAPI_API_KEY:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest'
+      - '--set-env-vars'
+      - 'ENVIRONMENT=${_ENVIRONMENT},PROJECT_ID=${_PROJECT_ID},REGION=${_REGION},PUBSUB_PROJECT_ID=${_PROJECT_ID},GCP_PROJECT_ID=${_PROJECT_ID},GOOGLE_CLOUD_PROJECT=${_PROJECT_ID}'
+      - '--memory'
+      - '1Gi'
+      - '--cpu'
+      - '2'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '5'
+      - '--port'
+      - '8083'
+      - '--allow-unauthenticated'
+      - '--quiet'
+
+images:
+  - '${_IMAGE_NAME}'
+
+substitutions:
+  _IMAGE_NAME: 'gcr.io/sentilyze-v6-clean/market-context'
+  _REGION: 'us-central1'
+  _ENVIRONMENT: 'production'
+  _PROJECT_ID: 'sentilyze-v6-clean'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+tags:
+  - sentilyze
+  - market-context
+  - cloud-run
+  - secret-manager
+  - ml-service
+
+secretManagerSecrets:
+  - name: 'GOLDAPI_API_KEY'
+    env: 'GOLDAPI_API_KEY'
+  - name: 'OPENAI_API_KEY'
+    env: 'OPENAI_API_KEY'

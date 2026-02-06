@@ -1,0 +1,71 @@
+steps:
+  # Build the alert service container
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '-t', '${_IMAGE_NAME}',
+      '-f', 'services/alert-service/Dockerfile',
+      '.'
+    ]
+
+  # Push the image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'push',
+      '${_IMAGE_NAME}'
+    ]
+
+  # Deploy to Cloud Run with Secret Manager integration
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'alert-service'
+      - '--image'
+      - '${_IMAGE_NAME}'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--service-account'
+      - 'sentilyze-alert-service@${_PROJECT_ID}.iam.gserviceaccount.com'
+      - '--set-secrets'
+      - 'TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest'
+      - '--set-env-vars'
+      - 'ENVIRONMENT=${_ENVIRONMENT},PROJECT_ID=${_PROJECT_ID},REGION=${_REGION},PUBSUB_PROJECT_ID=${_PROJECT_ID},GCP_PROJECT_ID=${_PROJECT_ID},GOOGLE_CLOUD_PROJECT=${_PROJECT_ID}'
+      - '--memory'
+      - '256Mi'
+      - '--cpu'
+      - '1'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '5'
+      - '--port'
+      - '8085'
+      - '--allow-unauthenticated'
+      - '--quiet'
+
+images:
+  - '${_IMAGE_NAME}'
+
+substitutions:
+  _IMAGE_NAME: 'gcr.io/sentilyze-v6-clean/alert-service'
+  _REGION: 'us-central1'
+  _ENVIRONMENT: 'production'
+  _PROJECT_ID: 'sentilyze-v6-clean'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+tags:
+  - sentilyze
+  - alert
+  - cloud-run
+  - secret-manager
+  - notifications
+
+secretManagerSecrets:
+  - name: 'TELEGRAM_BOT_TOKEN'
+    env: 'TELEGRAM_BOT_TOKEN'
