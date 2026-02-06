@@ -1,0 +1,18 @@
+User-agent: *
+Allow: /
+Allow: /blog
+Allow: /blog/
+Allow: /app
+
+Disallow: /admin
+Disallow: /api
+Disallow: /*.json$
+Disallow: /*.js$
+Disallow: /*?*sort=
+Disallow: /*?*filter=
+
+Crawl-delay: 1
+Request-rate: 30/60
+
+Sitemap: https://sentilyze.live/sitemap.xml
+Sitemap: https://sentilyze.live/blog-sitemap.xml
