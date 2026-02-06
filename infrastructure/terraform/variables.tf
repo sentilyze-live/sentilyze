@@ -74,7 +74,7 @@ variable "enable_firestore" {
 variable "enable_postgres" {
   description = "Enable PostgreSQL database"
   type        = bool
-  default     = true
+  default     = false
 }
 
 # Database Configuration
@@ -128,4 +128,11 @@ variable "firestore_location" {
   description = "Firestore database location"
   type        = string
   default     = "us-central"
+}
+
+# Agent OS v2
+variable "agent_os_url" {
+  description = "Cloud Run URL for Agent OS v2 service (set after first deploy)"
+  type        = string
+  default     = "https://agent-os-koa62feuuq-uc.a.run.app"
 }

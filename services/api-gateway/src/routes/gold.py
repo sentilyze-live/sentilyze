@@ -186,24 +186,31 @@ async def get_gold_price(
         price_data = await bq.get_gold_price_data(symbol, include_history)
         
         if price_data is None:
-            # Fallback to static data if no BigQuery data available
+            # Try to get a live price from Gold-API proxy as last resort
+            fallback_price = None
+            try:
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    metal = symbol[:3] if len(symbol) >= 3 else "XAU"
+                    resp = await client.get(f"https://api.gold-api.com/price/{metal}")
+                    if resp.status_code == 200:
+                        api_data = resp.json()
+                        if api_data.get("price"):
+                            fallback_price = api_data["price"]
+            except Exception:
+                pass
+
             price_data = {
                 "symbol": symbol,
-                "price": 2050.50 if "XAU" in symbol else 24.50,
+                "price": fallback_price or 0.0,
                 "currency": "USD" if "USD" in symbol else "EUR" if "EUR" in symbol else "TRY",
-                "change": 15.30,
-                "change_percent": 0.75,
+                "change": 0.0,
+                "change_percent": 0.0,
                 "timestamp": datetime.utcnow().isoformat(),
+                "data_source": "gold-api-fallback" if fallback_price else "unavailable",
             }
-            
-            if include_history:
-                price_data["history_24h"] = [
-                    {
-                        "timestamp": (datetime.utcnow() - timedelta(hours=i)).isoformat(),
-                        "price": 2050.50 + (i * 0.5),
-                    }
-                    for i in range(24, 0, -1)
-                ]
+
+            if not fallback_price:
+                logger.warning("No price data available from any source", symbol=symbol)
         
         log_audit(
             action="price_query",
@@ -256,26 +263,28 @@ async def get_all_gold_prices(
         try:
             price_data = await bq.get_gold_price_data(symbol, include_history=False)
             if price_data:
+                price_data["data_source"] = "bigquery"
                 prices.append(price_data)
             else:
-                # Fallback
+                # No data available - report honestly
                 prices.append({
                     "symbol": symbol,
-                    "price": 2050.50 if currency == "USD" else 1920.30,
+                    "price": 0.0,
                     "currency": currency,
-                    "change": 15.30,
-                    "change_percent": 0.75,
+                    "change": 0.0,
+                    "change_percent": 0.0,
                     "timestamp": datetime.utcnow().isoformat(),
+                    "data_source": "unavailable",
                 })
         except Exception:
-            # Fallback on error
             prices.append({
                 "symbol": symbol,
-                "price": 2050.50 if currency == "USD" else 1920.30,
+                "price": 0.0,
                 "currency": currency,
-                "change": 15.30,
-                "change_percent": 0.75,
+                "change": 0.0,
+                "change_percent": 0.0,
                 "timestamp": datetime.utcnow().isoformat(),
+                "data_source": "error",
             })
     
     log_audit(
@@ -355,9 +364,9 @@ async def get_gold_sentiment(
             
             sentiment_label = "positive" if avg_score > 0.3 else "negative" if avg_score < -0.3 else "neutral"
         else:
-            avg_score = 0.45
-            avg_confidence = 0.82
-            sentiment_label = "positive"
+            avg_score = 0.0
+            avg_confidence = 0.0
+            sentiment_label = "unavailable"
             sources = {
                 "financial_news": {"mentions": 0, "sentiment": 0},
                 "social_media": {"mentions": 0, "sentiment": 0},
@@ -384,6 +393,7 @@ async def get_gold_sentiment(
                 "label": sentiment_label,
             },
             "sources": sources,
+            "data_source": "bigquery" if items else "unavailable",
             "timestamp": datetime.utcnow().isoformat(),
         }
         
@@ -401,46 +411,132 @@ async def get_market_context(
     user: dict = Depends(get_optional_user),
 ) -> dict[str, Any]:
     """Get market context and regime for gold.
-    
+
+    Calculates regime, trend, volatility and support/resistance
+    from real BigQuery price data and economic indicators.
+
     Args:
         symbol: Gold symbol
         user: Current authenticated user (optional)
-        
+
     Returns:
         Market context including regime, trend, volatility
     """
     symbol = validate_symbol(symbol)
-    
+
     try:
+        bq = get_bq_helper()
+        price_data = await bq.get_gold_price_data(symbol, include_history=True)
+        data_source = "bigquery"
+
+        prices = []
+        if price_data and price_data.get("history"):
+            prices = [p["price"] for p in price_data["history"] if p.get("price")]
+
+        current_price = price_data["price"] if price_data else None
+
+        # Calculate trend from price data
+        if len(prices) >= 20:
+            sma_20 = sum(prices[-20:]) / 20
+            sma_50 = sum(prices[-50:]) / 50 if len(prices) >= 50 else sma_20
+
+            if sma_20 > sma_50 * 1.005:
+                trend_direction = "up"
+                trend_strength = min((sma_20 / sma_50 - 1) * 100, 1.0)
+            elif sma_20 < sma_50 * 0.995:
+                trend_direction = "down"
+                trend_strength = min((1 - sma_20 / sma_50) * 100, 1.0)
+            else:
+                trend_direction = "sideways"
+                trend_strength = 0.2
+
+            # Volatility from ATR-like calculation
+            price_changes = [abs(prices[i] - prices[i - 1]) for i in range(1, len(prices))]
+            avg_change = sum(price_changes[-14:]) / min(14, len(price_changes)) if price_changes else 0
+            volatility_pct = (avg_change / current_price * 100) if current_price else 0
+
+            if volatility_pct > 1.5:
+                vol_regime = "high"
+            elif volatility_pct > 0.5:
+                vol_regime = "normal"
+            else:
+                vol_regime = "low"
+
+            # Support/resistance from recent highs/lows
+            recent = prices[-30:] if len(prices) >= 30 else prices
+            pivot = (max(recent) + min(recent) + recent[-1]) / 3
+            support_1 = round(2 * pivot - max(recent), 2)
+            resistance_1 = round(2 * pivot - min(recent), 2)
+            support_2 = round(pivot - (max(recent) - min(recent)), 2)
+            resistance_2 = round(pivot + (max(recent) - min(recent)), 2)
+
+            # Regime from combined signals
+            if trend_direction == "up" and sma_20 > sma_50:
+                regime = "bullish"
+            elif trend_direction == "down" and sma_20 < sma_50:
+                regime = "bearish"
+            else:
+                regime = "neutral"
+        else:
+            trend_direction = "sideways"
+            trend_strength = 0.0
+            vol_regime = "normal"
+            regime = "neutral"
+            support_1 = current_price * 0.98 if current_price else 0
+            resistance_1 = current_price * 1.02 if current_price else 0
+            support_2 = current_price * 0.96 if current_price else 0
+            resistance_2 = current_price * 1.04 if current_price else 0
+            data_source = "insufficient_data"
+
+        # Fetch economic factors
+        factors = {"usd_strength": 0.0, "interest_rates": 0.0, "geopolitical_risk": 0.0}
+        factors_source = "unavailable"
+        try:
+            from services.prediction_engine.src.predictor import EconomicDataFetcher
+            econ = EconomicDataFetcher()
+            econ_data = await econ.fetch_economic_features()
+            if econ_data.get("dxy") is not None:
+                # DXY above 100 = strong USD = negative for gold
+                factors["usd_strength"] = round((100 - econ_data["dxy"]) / 100 * -1, 2) if econ_data["dxy"] else 0.0
+                factors_source = "bigquery"
+            if econ_data.get("treasury_10y") is not None:
+                factors["interest_rates"] = round(-econ_data["treasury_10y"] / 10, 2)
+            if econ_data.get("vix") is not None:
+                # Higher VIX = more geopolitical risk = positive for gold
+                factors["geopolitical_risk"] = round(min(econ_data["vix"] / 30, 1.0), 2)
+        except Exception as econ_err:
+            logger.warning("Economic data fetch failed for context", error=str(econ_err))
+
         context = {
             "symbol": symbol,
-            "regime": "bullish",
-            "trend_direction": "up",
-            "volatility_regime": "medium",
+            "regime": regime,
+            "trend_direction": trend_direction,
+            "trend_strength": round(trend_strength, 2),
+            "volatility_regime": vol_regime,
+            "volatility_value": round(volatility_pct, 4) if len(prices) >= 20 else 0.0,
             "technical_levels": {
-                "support": 2000.00,
-                "resistance": 2100.00,
+                "support": [round(support_1, 2), round(support_2, 2)],
+                "resistance": [round(resistance_1, 2), round(resistance_2, 2)],
             },
-            "factors": {
-                "usd_strength": -0.65,
-                "interest_rates": -0.45,
-                "geopolitical_risk": 0.80,
-            },
+            "factors": factors,
+            "data_source": data_source,
+            "factors_source": factors_source,
+            "price_data_points": len(prices),
             "last_updated": datetime.utcnow().isoformat(),
         }
-        
+
         log_audit(
             action="context_query",
             user=user,
             resource=f"context:{symbol}",
-            details={"regime": context["regime"]},
+            details={"regime": context["regime"], "data_source": data_source},
         )
-        
+
         return {
             "data": context,
             "timestamp": datetime.utcnow().isoformat(),
         }
-        
+
     except Exception as e:
         logger.error("Failed to fetch market context", error=str(e), symbol=symbol)
         raise HTTPException(
@@ -456,33 +552,45 @@ async def get_correlation(
     days: int = Query(default=30, ge=1, le=90, description="Analysis period in days"),
     user: dict = Depends(get_optional_user),
 ) -> dict[str, Any]:
-    """Get correlation between gold and another asset.
-    
+    """Get real correlation between gold and another asset from BigQuery data.
+
+    Calculates Pearson correlation coefficient from actual price data.
+
     Args:
         symbol: Gold symbol
-        compare_with: Asset to correlate (DXY, US10Y, SPX, etc.)
+        compare_with: Asset to correlate (DXY, US10Y, SPX, VIX, OIL, BTC)
         days: Number of days for analysis
         user: Current authenticated user (optional)
-        
+
     Returns:
-        Correlation analysis
+        Correlation analysis with real coefficient
     """
     symbol = validate_symbol(symbol)
     compare_with = sanitize_input(compare_with, max_length=10) or "DXY"
     compare_with = compare_with.upper()
-    
+
     try:
-        corr_value = -0.65 if compare_with == "DXY" else 0.25
-        
-        if abs(corr_value) > 0.7:
-            strength = "Strong"
-        elif abs(corr_value) > 0.4:
-            strength = "Moderate"
+        bq = get_bq_helper()
+        corr_result = await bq.get_correlation_data(
+            symbol=symbol,
+            compare_symbol=compare_with,
+            days=days,
+        )
+
+        if corr_result:
+            data_source = "bigquery"
+            corr_value = corr_result["correlation"]
+            strength = corr_result["strength"]
+            direction = corr_result["direction"]
+            data_points = corr_result["data_points"]
         else:
+            # No data available - return zeros with clear indication
+            data_source = "unavailable"
+            corr_value = 0.0
             strength = "Weak"
-        
-        direction = "negative" if corr_value < 0 else "positive"
-        
+            direction = "neutral"
+            data_points = 0
+
         correlation = {
             "symbol": symbol,
             "compare_with": compare_with,
@@ -492,24 +600,28 @@ async def get_correlation(
             "direction": direction,
             "interpretation": (
                 f"{strength} {direction} correlation between {symbol} and {compare_with}. "
-                f"Correlation coefficient: {corr_value:.2f}"
+                f"Correlation coefficient: {corr_value:.4f} ({data_points} data points)"
+            ) if data_points > 0 else (
+                f"Insufficient data to calculate correlation between {symbol} and {compare_with}. "
+                f"Need at least 5 overlapping data points."
             ),
-            "data_points": days,
+            "data_points": data_points,
+            "data_source": data_source,
             "last_calculated": datetime.utcnow().isoformat(),
         }
-        
+
         log_audit(
             action="correlation_query",
             user=user,
             resource=f"correlation:{symbol}:{compare_with}",
-            details={"days": days, "correlation": corr_value},
+            details={"days": days, "correlation": corr_value, "data_source": data_source},
         )
-        
+
         return {
             "data": correlation,
             "timestamp": datetime.utcnow().isoformat(),
         }
-        
+
     except Exception as e:
         logger.error(
             "Failed to calculate correlation",
@@ -545,11 +657,23 @@ async def get_gold_predictions(
         # Get current price
         bq = get_bq_helper()
         price_data = await bq.get_gold_price_data(symbol, include_history=True)
-        current_price = price_data["price"] if price_data else 2050.50
+        current_price = price_data["price"] if price_data else None
+        price_source = "bigquery" if price_data else "unavailable"
+
+        if current_price is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="No price data available. BigQuery may not have recent gold prices.",
+            )
 
         # Get price history for models
         price_history = price_data.get("history", []) if price_data else []
         prices = [p["price"] for p in price_history[-100:]] if price_history else [current_price] * 60
+
+        # Get real sentiment score from BigQuery
+        sentiment_data = await bq.get_sentiment_score_for_prediction(symbol)
+        sentiment_score = sentiment_data["score"]
+        sentiment_source = sentiment_data["data_source"]
 
         # Get prediction engine
         engine = get_prediction_engine()
@@ -574,9 +698,6 @@ async def get_gold_predictions(
                 indicators = tech_analyzer.calculate_indicators(prices)
             else:
                 indicators = TechnicalIndicators()
-
-            # Get sentiment (simplified for now)
-            sentiment_score = 0.0  # TODO: Fetch from sentiment service
 
             # Prepare feature history for LSTM (if enabled)
             feature_history = None
@@ -639,7 +760,7 @@ async def get_gold_predictions(
                             symbol=symbol,
                             current_price=current_price,
                             prices=prices,
-                            sentiment_score=0.0,
+                            sentiment_score=sentiment_score,
                             prediction_type=tf,
                             market_type="gold",
                         )
@@ -669,8 +790,10 @@ async def get_gold_predictions(
                 "xgboost": settings.enable_xgboost_model,
                 "ensemble": settings.enable_ensemble_predictions,
             },
-            "sentiment_score": 0.45,
-            "predictions": predictions,
+            "sentiment_score": sentiment_score,
+            "sentiment_source": sentiment_source,
+            "sentiment_count": sentiment_data.get("count", 0),
+            "price_source": price_source,
             "generated_at": datetime.utcnow().isoformat(),
             "disclaimer": "AI predictions are not investment advice. Past performance does not guarantee future results.",
         }
@@ -679,7 +802,7 @@ async def get_gold_predictions(
             action="predictions_query",
             user=user,
             resource=f"predictions:{symbol}",
-            details={"sentiment_score": 0.45},
+            details={"sentiment_score": sentiment_score, "sentiment_source": sentiment_source},
         )
 
         return {
@@ -718,14 +841,23 @@ async def get_prediction_scenarios(
         # Get current price
         bq = get_bq_helper()
         price_data = await bq.get_gold_price_data(symbol, include_history=True)
-        current_price = price_data["price"] if price_data else 2847.45
+        current_price = price_data["price"] if price_data else None
+
+        if current_price is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="No price data available for scenarios.",
+            )
+
+        # Get real sentiment score
+        sentiment_data = await bq.get_sentiment_score_for_prediction(symbol)
+        sentiment_score = sentiment_data["score"]
 
         # Get ensemble predictor
         ensemble = get_ensemble_predictor()
 
         if not ensemble or not settings.enable_ensemble_predictions:
             logger.warning("Ensemble predictor not available, using fallback")
-            # Fallback to basic prediction
             return [
                 {
                     "timeframe": "1 Saat",
@@ -737,6 +869,8 @@ async def get_prediction_scenarios(
                         {"name": "Random Forest", "weight": 1.0, "prediction": current_price * 1.0015},
                     ],
                     "note": "Ensemble models not enabled (set ENABLE_ENSEMBLE_PREDICTIONS=True)",
+                    "sentiment_score": sentiment_score,
+                    "sentiment_source": sentiment_data["data_source"],
                 }
             ]
 
@@ -756,8 +890,6 @@ async def get_prediction_scenarios(
             indicators = engine.technical_analyzer.calculate_indicators(prices)
         else:
             indicators = TechnicalIndicators()
-
-        sentiment_score = 0.0  # Simplified
 
         # Prepare feature history for LSTM
         feature_history = None
@@ -925,8 +1057,8 @@ async def get_daily_analysis_report(
         )
 
 
-# In-memory cache for Finnhub proxy (60-second TTL)
-_finnhub_cache: dict[str, dict[str, Any]] = {}
+# Unified cache via Redis (with in-memory fallback)
+from ..middleware.redis import cache_get, cache_set
 
 
 @router.get("/finnhub-proxy/{symbol}")
@@ -960,16 +1092,11 @@ async def finnhub_proxy(
 
     # Check cache first (60-second TTL)
     cache_key = f"finnhub:{symbol}"
-    now = datetime.utcnow()
 
-    if cache_key in _finnhub_cache:
-        cached_data = _finnhub_cache[cache_key]
-        cache_time = cached_data.get("_cache_time")
-        if cache_time and (now - cache_time).total_seconds() < 60:
-            logger.debug("Returning cached Finnhub data", symbol=symbol)
-            data = cached_data.copy()
-            del data["_cache_time"]
-            return data
+    cached = cache_get(cache_key)
+    if cached is not None:
+        logger.debug("Returning cached Finnhub data", symbol=symbol)
+        return cached
 
     # Fetch from Finnhub API
     try:
@@ -1001,14 +1128,8 @@ async def finnhub_proxy(
                     detail="Invalid response from Finnhub API",
                 )
 
-            # Cache the response
-            data["_cache_time"] = now
-            _finnhub_cache[cache_key] = data
-
-            # Clean up old cache entries (keep only last 100 entries)
-            if len(_finnhub_cache) > 100:
-                oldest_key = min(_finnhub_cache.keys(), key=lambda k: _finnhub_cache[k].get("_cache_time", now))
-                del _finnhub_cache[oldest_key]
+            # Cache the response (60s TTL)
+            cache_set(cache_key, data, ttl=60)
 
             log_audit(
                 action="finnhub_proxy_query",
@@ -1017,11 +1138,7 @@ async def finnhub_proxy(
                 details={"cached": False},
             )
 
-            # Remove internal cache timestamp before returning
-            result = data.copy()
-            del result["_cache_time"]
-
-            return result
+            return data
 
     except httpx.HTTPStatusError as e:
         logger.error("Finnhub API error", error=str(e), symbol=symbol, status_code=e.response.status_code)
@@ -1043,8 +1160,152 @@ async def finnhub_proxy(
         )
 
 
-# Gold-API.com cache (in-memory, 60-second TTL)
-_goldapi_cache: dict[str, dict[str, Any]] = {}
+# GenelPara API cache uses unified Redis/memory cache via cache_get/cache_set
+
+
+@router.get("/genelpara-proxy")
+async def genelpara_proxy(
+    list_type: str = Query(default="altin", alias="list", description="Data type: altin, doviz, kripto, emtia"),
+    symbols: str = Query(default="GA,XAUUSD", description="Comma-separated symbols (e.g., GA,C,XAUUSD)"),
+    user: dict = Depends(get_optional_user),
+) -> dict[str, Any]:
+    """Proxy GenelPara API requests to avoid CORS issues and add caching.
+
+    GenelPara provides free Turkish market data with 1000 req/day limit per IP.
+    This endpoint caches responses for 60 seconds to respect their limits.
+
+    Args:
+        list_type: Data category (altin=gold, doviz=forex, kripto=crypto, emtia=commodities)
+        symbols: Comma-separated symbols (use 'all' for all symbols in category)
+        user: Current authenticated user (optional)
+
+    Returns:
+        GenelPara API data with prices, changes, and remaining daily requests
+
+    Example:
+        GET /gold/genelpara-proxy?list=altin&symbols=GA,XAUUSD
+        Returns:
+        {
+            "success": true,
+            "count": 2,
+            "remaining": 998,
+            "data": {
+                "GA": {"alis": "6788.76", "satis": "6789.57", "degisim": "-1.82", ...},
+                "XAUUSD": {"alis": "4846.14", "satis": "4846.77", "degisim": "-1.86", ...}
+            }
+        }
+
+    Supported Gold Symbols:
+        GA - Gram Gold (TRY)
+        XAUUSD - Troy Ounce Gold (USD)
+        C - Quarter Gold (TRY)
+        Y - Half Gold (TRY)
+        T - Full Gold (TRY)
+        GAG - Gram Silver (TRY)
+        ... and 12 more gold types
+    """
+    # Sanitize inputs
+    list_type = sanitize_input(list_type, max_length=20) or "altin"
+    symbols = sanitize_input(symbols, max_length=200) or "GA,XAUUSD"
+
+    # Validate list_type
+    allowed_types = ["altin", "doviz", "kripto", "emtia"]
+    if list_type not in allowed_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid list type. Allowed: {', '.join(allowed_types)}",
+        )
+
+    # Check cache first (60-second TTL)
+    cache_key = f"genelpara:{list_type}:{symbols}"
+
+    cached = cache_get(cache_key)
+    if cached is not None:
+        logger.debug("Returning cached GenelPara data", list_type=list_type, symbols=symbols)
+        return cached
+
+    # Fetch from GenelPara API
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            # GenelPara API format: /json/?list=altin&sembol=GA,C
+            # Use 'all' for all symbols, or comma-separated list for specific ones
+            url = f"https://api.genelpara.com/json/"
+            params = {
+                "list": list_type,
+                "sembol": symbols if symbols.lower() != "all" else "all"
+            }
+
+            response = await client.get(url, params=params)
+
+            if response.status_code == 429:
+                logger.warning("GenelPara rate limit exceeded", list_type=list_type)
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="GenelPara API rate limit exceeded (1000 req/day). Please try again tomorrow.",
+                )
+
+            response.raise_for_status()
+            data = response.json()
+
+            # Validate response
+            if not data or not data.get("success"):
+                error_msg = data.get("message", "Unknown error") if data else "Invalid response"
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"GenelPara API error: {error_msg}",
+                )
+
+            # Log remaining requests for monitoring
+            remaining = data.get("remaining", "unknown")
+            if isinstance(remaining, int) and remaining < 100:
+                logger.warning(
+                    "GenelPara API requests running low",
+                    remaining=remaining,
+                    reset_at="00:00 daily"
+                )
+
+            # Cache the response (60s TTL)
+            cache_set(cache_key, data, ttl=60)
+
+            log_audit(
+                action="genelpara_proxy_query",
+                user=user,
+                resource=f"genelpara:{list_type}:{symbols}",
+                details={
+                    "cached": False,
+                    "count": data.get("count", 0),
+                    "remaining": remaining
+                },
+            )
+
+            return data
+
+    except httpx.HTTPStatusError as e:
+        logger.error(
+            "GenelPara API error",
+            error=str(e),
+            list_type=list_type,
+            status_code=e.response.status_code,
+        )
+        raise HTTPException(
+            status_code=e.response.status_code,
+            detail=f"GenelPara API error: {e.response.text}",
+        )
+    except httpx.RequestError as e:
+        logger.error("GenelPara API request failed", error=str(e), list_type=list_type)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Failed to connect to GenelPara API",
+        )
+    except Exception as e:
+        logger.error("GenelPara proxy error", error=str(e), list_type=list_type)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error while proxying GenelPara request",
+        )
+
+
+# Gold-API.com cache uses unified Redis/memory cache via cache_get/cache_set
 
 
 @router.get("/gold-api-proxy/{symbol}")
@@ -1084,16 +1345,11 @@ async def gold_api_proxy(
 
     # Check cache first (60-second TTL)
     cache_key = f"goldapi:{symbol}"
-    now = datetime.utcnow()
 
-    if cache_key in _goldapi_cache:
-        cached_data = _goldapi_cache[cache_key]
-        cache_time = cached_data.get("_cache_time")
-        if cache_time and (now - cache_time).total_seconds() < 60:
-            logger.debug("Returning cached Gold-API data", symbol=symbol)
-            data = cached_data.copy()
-            del data["_cache_time"]
-            return data
+    cached = cache_get(cache_key)
+    if cached is not None:
+        logger.debug("Returning cached Gold-API data", symbol=symbol)
+        return cached
 
     # Fetch from Gold-API.com
     try:
@@ -1138,17 +1394,8 @@ async def gold_api_proxy(
                     detail="Invalid response from Gold-API",
                 )
 
-            # Cache the response
-            data["_cache_time"] = now
-            _goldapi_cache[cache_key] = data
-
-            # Clean up old cache entries (keep only last 100 entries)
-            if len(_goldapi_cache) > 100:
-                oldest_key = min(
-                    _goldapi_cache.keys(),
-                    key=lambda k: _goldapi_cache[k].get("_cache_time", now),
-                )
-                del _goldapi_cache[oldest_key]
+            # Cache the response (60s TTL)
+            cache_set(cache_key, data, ttl=60)
 
             log_audit(
                 action="gold_api_proxy_query",
@@ -1157,11 +1404,7 @@ async def gold_api_proxy(
                 details={"cached": False},
             )
 
-            # Remove internal cache timestamp before returning
-            result = data.copy()
-            del result["_cache_time"]
-
-            return result
+            return data
 
     except httpx.HTTPStatusError as e:
         logger.error(
@@ -1189,9 +1432,6 @@ async def gold_api_proxy(
 
 
 # Exchangerate-API cache (in-memory, 300-second TTL)
-_exchangerate_cache: dict[str, dict[str, Any]] = {}
-
-
 @router.get("/exchangerate-proxy/{base}")
 async def exchangerate_proxy(
     base: str,
@@ -1225,16 +1465,11 @@ async def exchangerate_proxy(
 
     # Check cache first (300-second TTL = 5 minutes)
     cache_key = f"exchangerate:{base}"
-    now = datetime.utcnow()
 
-    if cache_key in _exchangerate_cache:
-        cached_data = _exchangerate_cache[cache_key]
-        cache_time = cached_data.get("_cache_time")
-        if cache_time and (now - cache_time).total_seconds() < 300:
-            logger.debug("Returning cached Exchangerate-API data", base=base)
-            data = cached_data.copy()
-            del data["_cache_time"]
-            return data
+    cached = cache_get(cache_key)
+    if cached is not None:
+        logger.debug("Returning cached Exchangerate-API data", base=base)
+        return cached
 
     # Fetch from Exchangerate-API
     try:
@@ -1260,17 +1495,8 @@ async def exchangerate_proxy(
                     detail="Invalid response from Exchangerate-API",
                 )
 
-            # Cache the response
-            data["_cache_time"] = now
-            _exchangerate_cache[cache_key] = data
-
-            # Clean up old cache entries (keep only last 50 entries)
-            if len(_exchangerate_cache) > 50:
-                oldest_key = min(
-                    _exchangerate_cache.keys(),
-                    key=lambda k: _exchangerate_cache[k].get("_cache_time", now),
-                )
-                del _exchangerate_cache[oldest_key]
+            # Cache the response (300s = 5 min TTL)
+            cache_set(cache_key, data, ttl=300)
 
             log_audit(
                 action="exchangerate_proxy_query",
@@ -1279,11 +1505,7 @@ async def exchangerate_proxy(
                 details={"cached": False},
             )
 
-            # Remove internal cache timestamp before returning
-            result = data.copy()
-            del result["_cache_time"]
-
-            return result
+            return data
 
     except httpx.HTTPStatusError as e:
         logger.error(
@@ -1420,4 +1642,287 @@ async def get_model_info(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve model information",
+        )
+
+
+@router.get("/technical-indicators/{symbol}")
+async def get_technical_indicators(
+    symbol: str,
+    user: dict = Depends(get_optional_user),
+) -> dict[str, Any]:
+    """Get real technical indicators calculated from BigQuery price data.
+
+    Calculates RSI, MACD, Bollinger Bands, EMAs, and Stochastic from actual
+    price history - no random or mock data.
+
+    Args:
+        symbol: Gold symbol (XAUUSD, etc.)
+        user: Current authenticated user (optional)
+
+    Returns:
+        Technical indicator values calculated from real data
+    """
+    symbol = validate_symbol(symbol)
+
+    try:
+        bq = get_bq_helper()
+        price_data = await bq.get_gold_price_data(symbol, include_history=True)
+
+        if not price_data or not price_data.get("history"):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Insufficient price data for technical analysis.",
+            )
+
+        prices = [p["price"] for p in price_data["history"] if p.get("price")]
+        current_price = price_data["price"]
+
+        if len(prices) < 20:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Need at least 20 data points, have {len(prices)}.",
+            )
+
+        engine = get_prediction_engine()
+        if engine and len(prices) >= 50:
+            indicators = engine.technical_analyzer.calculate_indicators(prices)
+
+            # Determine RSI condition
+            rsi_val = indicators.rsi or 50
+            if rsi_val > 70:
+                rsi_condition = "overbought"
+            elif rsi_val < 30:
+                rsi_condition = "oversold"
+            else:
+                rsi_condition = "neutral"
+
+            # Determine MACD momentum
+            macd_hist = indicators.macd_histogram or 0
+            macd_momentum = "positive" if macd_hist > 0 else "negative"
+
+            # Stochastic from prices
+            recent_14 = prices[-14:]
+            highest = max(recent_14)
+            lowest = min(recent_14)
+            stoch_range = highest - lowest
+            stoch_k = ((current_price - lowest) / stoch_range * 100) if stoch_range > 0 else 50
+            stoch_d = stoch_k  # Simplified (proper: 3-period SMA of %K)
+
+            if stoch_k > 80:
+                stoch_condition = "overbought"
+            elif stoch_k < 20:
+                stoch_condition = "oversold"
+            else:
+                stoch_condition = "neutral"
+
+            result = {
+                "symbol": symbol,
+                "current_price": current_price,
+                "rsi": {
+                    "value": round(rsi_val, 2),
+                    "condition": rsi_condition,
+                },
+                "macd": {
+                    "value": round(indicators.macd or 0, 4),
+                    "signal": round(indicators.macd_signal or 0, 4),
+                    "momentum": macd_momentum,
+                    "histogram": round(macd_hist, 4),
+                },
+                "bollinger": {
+                    "upper": round(indicators.bb_upper or current_price * 1.02, 2),
+                    "middle": round(indicators.bb_middle or current_price, 2),
+                    "lower": round(indicators.bb_lower or current_price * 0.98, 2),
+                    "width": round(
+                        ((indicators.bb_upper or 0) - (indicators.bb_lower or 0)) / current_price * 100, 2
+                    ) if current_price else 0,
+                },
+                "ema": {
+                    "short": round(indicators.ema_short or 0, 2),
+                    "medium": round(indicators.ema_medium or 0, 2),
+                    "long": round(indicators.ema_long or 0, 2),
+                },
+                "sma": {
+                    "20": round(sum(prices[-20:]) / 20, 2) if len(prices) >= 20 else 0,
+                    "50": round(sum(prices[-50:]) / 50, 2) if len(prices) >= 50 else 0,
+                    "200": round(sum(prices[-200:]) / 200, 2) if len(prices) >= 200 else 0,
+                },
+                "stochastic": {
+                    "k": round(stoch_k, 2),
+                    "d": round(stoch_d, 2),
+                    "condition": stoch_condition,
+                },
+                "atr": round(
+                    sum(abs(prices[i] - prices[i - 1]) for i in range(max(1, len(prices) - 14), len(prices)))
+                    / min(14, len(prices) - 1), 2
+                ) if len(prices) > 1 else 0,
+                "data_points": len(prices),
+                "data_source": "bigquery",
+                "generated_at": datetime.utcnow().isoformat(),
+            }
+        else:
+            # Minimal calculation with less data
+            import numpy as np
+            prices_arr = prices[-20:]
+            sma_20 = sum(prices_arr) / len(prices_arr)
+
+            result = {
+                "symbol": symbol,
+                "current_price": current_price,
+                "rsi": {"value": 50.0, "condition": "neutral"},
+                "macd": {"value": 0, "signal": 0, "momentum": "neutral", "histogram": 0},
+                "bollinger": {
+                    "upper": round(sma_20 + 2 * float(np.std(prices_arr)), 2),
+                    "middle": round(sma_20, 2),
+                    "lower": round(sma_20 - 2 * float(np.std(prices_arr)), 2),
+                    "width": 0,
+                },
+                "ema": {"short": 0, "medium": 0, "long": 0},
+                "sma": {"20": round(sma_20, 2), "50": 0, "200": 0},
+                "stochastic": {"k": 50, "d": 50, "condition": "neutral"},
+                "atr": 0,
+                "data_points": len(prices),
+                "data_source": "bigquery",
+                "note": "Limited data - need 50+ points for full analysis",
+                "generated_at": datetime.utcnow().isoformat(),
+            }
+
+        log_audit(
+            action="technical_indicators_query",
+            user=user,
+            resource=f"indicators:{symbol}",
+            details={"data_points": len(prices)},
+        )
+
+        return {"data": result, "timestamp": datetime.utcnow().isoformat()}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to calculate technical indicators", error=str(e), symbol=symbol)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to calculate technical indicators",
+        )
+
+
+@router.get("/history/{symbol}")
+async def get_gold_history(
+    symbol: str,
+    timeframe: str = Query(default="1D", description="Timeframe: 1D, 1W, 1M, 3M, 1Y"),
+    limit: int = Query(default=100, ge=1, le=500, description="Max data points"),
+    user: dict = Depends(get_optional_user),
+) -> dict[str, Any]:
+    """Get real gold price history from BigQuery.
+
+    Returns actual OHLCV data, not synthetic/random data.
+
+    Args:
+        symbol: Gold symbol
+        timeframe: Time period (1D, 1W, 1M, 3M, 1Y)
+        limit: Maximum data points to return
+        user: Current authenticated user (optional)
+
+    Returns:
+        Historical OHLCV price data
+    """
+    symbol = validate_symbol(symbol)
+    timeframe = sanitize_input(timeframe, max_length=5) or "1D"
+    timeframe = timeframe.upper()
+
+    if timeframe not in ("1D", "1W", "1M", "3M", "1Y"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid timeframe. Supported: 1D, 1W, 1M, 3M, 1Y",
+        )
+
+    try:
+        bq = get_bq_helper()
+        history = await bq.get_gold_price_history(
+            symbol=symbol,
+            timeframe=timeframe,
+            limit=limit,
+        )
+
+        if history:
+            data_source = "bigquery"
+        else:
+            history = []
+            data_source = "unavailable"
+
+        log_audit(
+            action="history_query",
+            user=user,
+            resource=f"history:{symbol}",
+            details={"timeframe": timeframe, "data_points": len(history)},
+        )
+
+        return {
+            "data": {
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "prices": history,
+                "count": len(history),
+                "data_source": data_source,
+            },
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+    except Exception as e:
+        logger.error("Failed to fetch price history", error=str(e), symbol=symbol)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch price history",
+        )
+
+
+@router.get("/news")
+async def get_gold_news(
+    page: int = Query(default=1, ge=1, description="Page number"),
+    limit: int = Query(default=20, ge=1, le=50, description="Articles per page"),
+    user: dict = Depends(get_optional_user),
+) -> dict[str, Any]:
+    """Get gold-related news articles from BigQuery.
+
+    Args:
+        page: Page number for pagination
+        limit: Number of articles per page
+        user: Current authenticated user (optional)
+
+    Returns:
+        List of gold news articles with sentiment scores
+    """
+    try:
+        bq = get_bq_helper()
+        offset = (page - 1) * limit
+        result = await bq.get_gold_news(limit=limit, offset=offset)
+
+        articles = result.get("articles", [])
+        total = result.get("total", 0)
+
+        log_audit(
+            action="news_query",
+            user=user,
+            resource="news:gold",
+            details={"page": page, "count": len(articles)},
+        )
+
+        return {
+            "data": {
+                "articles": articles,
+                "pagination": {
+                    "page": page,
+                    "limit": limit,
+                    "total": total,
+                    "has_more": (offset + len(articles)) < total,
+                },
+                "data_source": "bigquery" if articles else "unavailable",
+            },
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+    except Exception as e:
+        logger.error("Failed to fetch gold news", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch gold news",
         )

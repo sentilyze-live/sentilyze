@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from .config import get_settings
 from .logging import configure_logging, get_logger
 from .middleware.rate_limit import rate_limit_middleware, close_rate_limiter
+from .middleware.redis import init_redis, close_redis, cache_info
 from .routes import register_routers
 
 settings = get_settings()
@@ -106,10 +107,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         websocket=settings.feature_websocket,
     )
 
+    # Initialize Redis cache
+    redis_connected = await init_redis()
+    logger.info("Cache initialized", backend="redis" if redis_connected else "memory")
+
     yield
 
     # Shutdown
     logger.info("Shutting down API Gateway")
+    await close_redis()
     await close_rate_limiter()
 
 
@@ -204,6 +210,7 @@ async def health_check() -> dict:
         "status": "healthy",
         "service": settings.app_name,
         "version": settings.app_version,
+        "cache": cache_info(),
     }
 
 

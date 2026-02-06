@@ -3,6 +3,7 @@
 import asyncio
 import base64
 import json
+import os
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
@@ -31,12 +32,14 @@ from .models import PredictionResult, TechnicalIndicators
 from .predictor import PredictionEngine
 from .publisher import PredictionPublisher
 from .ensemble import EnsemblePredictor
+from .training import TrainingPipeline
+from .feedback import FeedbackLoop
 
 logger = get_logger(__name__)
 settings = get_prediction_settings()
 
 SERVICE_NAME = "prediction-engine"
-SERVICE_VERSION = "3.0.0"
+SERVICE_VERSION = "3.1.0"
 
 # Global instances
 prediction_engine: PredictionEngine | None = None
@@ -44,6 +47,8 @@ ensemble_predictor: EnsemblePredictor | None = None
 publisher: PredictionPublisher | None = None
 pubsub_client: PubSubClient | None = None
 bigquery_client: BigQueryClient | None = None
+training_pipeline: TrainingPipeline | None = None
+feedback_loop: FeedbackLoop | None = None
 
 
 # Pydantic Models
@@ -90,7 +95,7 @@ class BatchPredictionResponse(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager."""
-    global prediction_engine, ensemble_predictor, publisher, pubsub_client, bigquery_client
+    global prediction_engine, ensemble_predictor, publisher, pubsub_client, bigquery_client, training_pipeline, feedback_loop
 
     configure_logging(
         log_level=settings.log_level,
@@ -107,6 +112,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Initialize engine
     prediction_engine = PredictionEngine()
+
+    # Initialize training pipeline and feedback loop
+    training_pipeline = TrainingPipeline(models_dir="models")
+    feedback_loop = FeedbackLoop()
+
+    # Try to load pre-trained models from GCS
+    await _load_models_from_gcs()
 
     # Initialize ensemble predictor if enabled
     if settings.enable_ensemble_predictions:
@@ -236,7 +248,34 @@ async def generate_prediction(request: GeneratePredictionRequest):
         
         # Publish to Pub/Sub
         await publisher.publish_prediction(prediction)
-        
+
+        # Record in feedback loop for outcome tracking
+        if feedback_loop:
+            try:
+                indicators = result["technical_indicators"]
+                await feedback_loop.record_prediction(
+                    prediction_id=prediction_id,
+                    symbol=result["symbol"],
+                    market_type=result["market_type"],
+                    prediction_type=result["prediction_type"],
+                    predicted_direction=result["predicted_direction"],
+                    predicted_price=result["predicted_price"],
+                    current_price=result["current_price"],
+                    confidence_score=result["confidence_score"],
+                    technical_signal=prediction_engine.technical_analyzer.calculate_technical_signal(
+                        TechnicalIndicators(**indicators)
+                    ),
+                    sentiment_score=result["sentiment_score"],
+                    ml_prediction=0.0,
+                    indicator_signals={
+                        "rsi": indicators.get("rsi", 50) / 100 - 0.5,
+                        "macd": 0.3 if (indicators.get("macd_histogram") or 0) > 0 else -0.3,
+                        "ema_cross": 0.4 if (indicators.get("ema_short") or 0) > (indicators.get("ema_medium") or 0) else -0.4,
+                    },
+                )
+            except Exception as fb_err:
+                logger.debug("Feedback recording failed (non-fatal)", error=str(fb_err))
+
         return GeneratePredictionResponse(
             prediction_id=prediction_id,
             symbol=result["symbol"],
@@ -523,6 +562,64 @@ async def pubsub_push_market_context(request: Request) -> dict[str, str]:
         raise HTTPException(status_code=500, detail="processing failed")
 
 
+# --- Feedback Loop Endpoints ---
+
+class RecordOutcomeRequest(BaseModel):
+    """Request to record a prediction outcome."""
+    prediction_id: str = Field(..., description="Original prediction ID")
+    actual_price: float = Field(..., description="Actual price at expiry")
+
+
+@app.post("/feedback/outcome", tags=["feedback"])
+async def record_prediction_outcome(request: RecordOutcomeRequest):
+    """Record actual outcome for a prediction."""
+    if not feedback_loop:
+        raise HTTPException(status_code=503, detail="Feedback loop not initialized")
+
+    result = await feedback_loop.record_outcome(
+        prediction_id=request.prediction_id,
+        actual_price=request.actual_price,
+    )
+
+    if result is None:
+        raise HTTPException(status_code=404, detail="Prediction not found")
+
+    return {"status": "recorded", "outcome": result}
+
+
+@app.post("/feedback/resolve-expired", tags=["feedback"])
+async def resolve_expired_predictions(req: Request):
+    """Resolve expired predictions by fetching actual prices."""
+    api_key = req.headers.get("X-Admin-API-Key") or req.headers.get("x-admin-api-key")
+    admin_key = os.getenv("ADMIN_API_KEY", "")
+    if not admin_key or api_key != admin_key:
+        raise HTTPException(status_code=403, detail="Admin API key required")
+
+    if not feedback_loop:
+        raise HTTPException(status_code=503, detail="Feedback loop not initialized")
+
+    resolved = await feedback_loop.check_and_resolve_expired()
+    return {"status": "ok", "resolved_count": resolved}
+
+
+@app.get("/feedback/accuracy", tags=["feedback"])
+async def get_accuracy_report():
+    """Get prediction accuracy report and indicator performance."""
+    if not feedback_loop:
+        return {"status": "not_initialized"}
+
+    return feedback_loop.get_accuracy_report()
+
+
+@app.get("/feedback/weights", tags=["feedback"])
+async def get_optimized_weights():
+    """Get current optimized prediction weights."""
+    if not feedback_loop:
+        return settings.prediction_weights
+
+    return feedback_loop.get_current_weights()
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     """Global exception handler."""
@@ -531,6 +628,95 @@ async def global_exception_handler(request, exc):
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": "Internal server error"},
     )
+
+
+async def _load_models_from_gcs() -> None:
+    """Try to download pre-trained models from GCS on startup."""
+    try:
+        from google.cloud import storage
+
+        bucket_name = f"{settings.google_cloud_project}-models"
+        client = storage.Client(project=settings.google_cloud_project)
+
+        try:
+            bucket = client.get_bucket(bucket_name)
+        except Exception:
+            logger.info("Models bucket not found, skipping GCS model load")
+            return
+
+        prefix = "prediction-engine/XAU/latest/"
+        blobs = list(bucket.list_blobs(prefix=prefix))
+
+        if not blobs:
+            logger.info("No pre-trained models found in GCS")
+            return
+
+        os.makedirs("models", exist_ok=True)
+
+        for blob in blobs:
+            filename = blob.name.split("/")[-1]
+            if not filename:
+                continue
+            local_path = os.path.join("models", filename)
+            blob.download_to_filename(local_path)
+            logger.info("Downloaded model from GCS", file=filename)
+
+        logger.info("Pre-trained models loaded from GCS", count=len(blobs))
+
+    except Exception as e:
+        logger.warning("Could not load models from GCS (non-fatal)", error=str(e))
+
+
+class TrainRequest(BaseModel):
+    """Request to trigger model training."""
+    symbol: str = Field(default="XAU", description="Asset symbol to train on")
+    days: int = Field(default=180, description="Days of historical data", ge=30, le=365)
+    save_to_gcs: bool = Field(default=True, description="Upload models to GCS")
+
+
+@app.post("/train", tags=["training"])
+async def trigger_training(request: TrainRequest, req: Request):
+    """Trigger model training pipeline.
+
+    Protected by admin API key. Trains all ML models on historical data.
+    """
+    # Require admin API key
+    api_key = req.headers.get("X-Admin-API-Key") or req.headers.get("x-admin-api-key")
+    admin_key = os.getenv("ADMIN_API_KEY", "")
+    if not admin_key or api_key != admin_key:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin API key required",
+        )
+
+    if not training_pipeline:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Training pipeline not initialized",
+        )
+
+    try:
+        results = await training_pipeline.run_full_training(
+            symbol=request.symbol,
+            days=request.days,
+            save_to_gcs=request.save_to_gcs,
+        )
+        return results
+    except Exception as e:
+        logger.error("Training failed", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Training failed: {str(e)}",
+        )
+
+
+@app.get("/training/status", tags=["training"])
+async def get_training_status():
+    """Get last training results."""
+    if not training_pipeline:
+        return {"status": "not_initialized"}
+
+    return training_pipeline.training_results or {"status": "no_training_run"}
 
 
 if __name__ == "__main__":
